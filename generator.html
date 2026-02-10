@@ -12,52 +12,70 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
  height:48px;display:flex;align-items:center;
  justify-content:space-between;
  padding:0 12px;background:#020617;
- border-bottom:1px solid #1f2937;
 }
 
-.backMini{
- padding:8px 12px;border-radius:10px;
- border:none;font-weight:800;
- background:#334155;color:white;
+.container{padding:16px;max-width:1100px;margin:auto;}
+.card{background:#111827;padding:16px;border-radius:14px;margin-bottom:14px;}
+
+input,select{
+ width:100%;padding:12px;border-radius:10px;border:none;margin-top:6px;
 }
 
-.container{padding:16px;max-width:1000px;margin:auto;}
-
-.card{
- background:#111827;
- padding:16px;
- border-radius:14px;
- margin-bottom:14px;
+button{
+ padding:12px;border-radius:10px;border:none;margin-top:10px;
+ font-weight:800;
 }
 
-select,input{width:100%;padding:12px;border-radius:10px;border:none;margin-top:8px;}
-button{padding:12px;border-radius:10px;border:none;margin-top:10px;}
-
-.genBtn{background:#f59e0b;font-weight:900;width:100%;}
-.saveBtn{background:#22c55e;font-weight:900;width:100%;}
+.genBtn{background:#f59e0b;width:100%;}
+.saveBtn{background:#22c55e;width:100%;}
 
 /* TABLE */
 
-.tableWrap{overflow:auto;border-radius:12px;border:1px solid #1f2937;}
-
 table{width:100%;border-collapse:collapse;font-size:13px;}
 th,td{padding:8px;border-bottom:1px solid #1f2937;text-align:center;}
+th{background:#020617;}
+.posCol{font-weight:800;text-align:left;background:#020617;}
+td.slot{cursor:pointer;}
+td.slot:hover{background:#1f2937;}
 
-th{background:#020617;position:sticky;top:0;}
-.posCol{
- text-align:left;font-weight:800;
+/* RESERVES */
+
+.resBox{
  background:#020617;
- position:sticky;left:0;
+ padding:10px;
+ border-radius:10px;
+ margin-top:8px;
+ font-size:13px;
+ line-height:1.4;
 }
 
-.small{opacity:.7;font-size:13px;}
+/* MODAL */
+
+.modal{
+ position:fixed;inset:0;background:rgba(0,0,0,.7);
+ display:none;align-items:center;justify-content:center;
+}
+
+.modalBox{
+ background:#020617;padding:18px;border-radius:16px;
+ width:90%;max-width:420px;
+}
+
+.pickBtn{
+ width:100%;
+ margin-top:8px;
+ background:#2563eb;
+ color:white;
+}
+
+.removeBtn{background:#ef4444;}
 
 /* LOADING */
 
 .loading{
  position:fixed;
  inset:0;
- background:rgba(0,0,0,.7);
+ background:rgba(0,0,0,.75);
  display:none;
  align-items:center;
  justify-content:center;
@@ -70,16 +88,17 @@ th{background:#020617;position:sticky;top:0;}
 
 <body>
 
-<div class="loading" id="loading">🔍 Generuji obsazení…</div>
+<div class="loading" id="loading">🔍 Generuji směnu…</div>
 
 <div class="topbar">
-<button class="backMini" onclick="location.href='index.html'">← Menu</button>
 <div>Generátor směny</div>
+<button onclick="location.href='index.html'">Menu</button>
 </div>
 
 <div class="container">
 
 <div class="card">
+
 <label>Datum</label>
 <input type="date" id="date">
 
@@ -90,30 +109,40 @@ th{background:#020617;position:sticky;top:0;}
 <option value="noc">Noční</option>
 </select>
 
-<button class="genBtn" id="genBtn">⚙️ Obsadit pozice</button>
+<button class="genBtn" id="genBtn">⚙️ Generovat</button>
+
 </div>
 
 <div class="card">
-<h4>Obsazení pozic</h4>
-<div class="tableWrap">
 <table id="grid"></table>
 </div>
-</div>
 
 <div class="card">
-<h4>Náhradníci</h4>
-<div id="reserves" class="small"></div>
+<h4>Náhradníci podle fází</h4>
+<div id="reservesBox"></div>
 </div>
 
-<button class="saveBtn" id="saveBtn">💾 Uložit směnu</button>
+<button class="saveBtn">💾 Uložit</button>
 
+</div>
+
+<!-- PICK MODAL -->
+
+<div class="modal" id="pickModal">
+ <div class="modalBox">
+   <div id="pickTitle"></div>
+   <div id="pickList"></div>
+   <button onclick="closePick()">Zavřít</button>
+ </div>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, setDoc }
+import { getFirestore, collection, getDocs }
 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+/* FIREBASE */
 
 const app = initializeApp({
  apiKey:"AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
@@ -125,19 +154,16 @@ const db = getFirestore(app);
 
 /* DOM */
 
+const loadingEl = document.getElementById("loading");
 const dateEl = document.getElementById("date");
 const shiftEl = document.getElementById("shift");
 const gridEl = document.getElementById("grid");
-const reservesEl = document.getElementById("reserves");
+const reservesBoxEl = document.getElementById("reservesBox");
 const genBtn = document.getElementById("genBtn");
-const saveBtn = document.getElementById("saveBtn");
-const loading = document.getElementById("loading");
-
-/* DEFAULT DATE */
 
 dateEl.value = new Date().toISOString().slice(0,10);
 
-/* POZICE (bez VET INST) */
+/* POZICE */
 
 const POSITIONS = [
 "DP-L","DP-P","ZRC-L","ZRC-P","T-L","T-P",
@@ -147,172 +173,190 @@ const POSITIONS = [
 "VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
 ];
 
+let workers=[];
 let phases=[];
-let reserveWorkers=[];
+let phaseReserves=[];
+let lastPosByWorker={};
 
-/* TIME LABELS */
+/* LOAD WORKERS */
 
-function phaseLabels(){
- const s = shiftEl.value;
- if(s==="ranni") return ["6–8","8–10","10–12","12–14"];
- if(s==="odpo") return ["14–16","16–18","18–20","20–22"];
- return ["22–00","00–02","02–04","04–06"];
-}
-
-/* BUILD PHASE1 */
-
-async function buildPhase1(){
+async function loadWorkers(){
 
  const snap = await getDocs(collection(db,"employees"));
+ workers=[];
 
- const workers=[];
  snap.forEach(d=>{
   const e=d.data();
   if(e.statusToday==="work"){
     workers.push({
       id:d.id,
-      name:e.name+" "+e.surname,
+      name:e.name,
       skills:e.skills||[]
     });
   }
  });
-
- /* kandidáti pro každou pozici */
-
- const candidatesMap = {};
-
- POSITIONS.forEach(pos=>{
-   candidatesMap[pos] = workers.filter(w=>w.skills.includes(pos));
- });
-
- /* seřadit pozice od nejtěžších */
-
- const orderedPositions = [...POSITIONS]
-   .sort((a,b)=>
-     candidatesMap[a].length - candidatesMap[b].length
-   );
-
- const used = new Set();
- const assign = {};
-
- for(const pos of orderedPositions){
-
-   const cand = candidatesMap[pos]
-     .filter(w=>!used.has(w.id))
-     .sort(()=>Math.random()-.5)[0];
-
-   if(cand){
-     assign[pos] = cand;
-     used.add(cand.id);
-   } else {
-     assign[pos] = null;
-   }
- }
-
- reserveWorkers = workers.filter(w=>!used.has(w.id));
-
- return assign;
 }
 
-/* ROTACE */
+/* SMART PHASE */
 
-function rotate(prev){
+function buildPhase(){
 
- const a={};
+ const map={};
+ POSITIONS.forEach(p=>{
+   map[p]=workers.filter(w=>w.skills.includes(p));
+ });
+
+ const ordered=[...POSITIONS]
+   .sort((a,b)=>map[a].length-map[b].length);
+
  const used=new Set();
+ const assign={};
 
- for(const pos of POSITIONS){
+ ordered.forEach(pos=>{
 
-   const pw = prev[pos];
-   if(!pw){a[pos]=null;continue;}
+  const pool = map[pos]
+   .filter(w=>!used.has(w.id))
+   .map(w=>{
+     const penalty = lastPosByWorker[w.id]===pos ? 0.25 : 1;
+     return {w,score:Math.random()*penalty};
+   })
+   .sort((a,b)=>b.score-a.score);
 
-   if(pw.skills.length<=1){
-     a[pos]=pw; used.add(pw.id); continue;
-   }
+  if(pool.length){
+    assign[pos]=pool[0].w;
+    used.add(pool[0].w.id);
+    lastPosByWorker[pool[0].w.id]=pos;
+  } else assign[pos]=null;
 
-   const cand = Object.values(prev)
-     .filter(w=>w && w.id!==pw.id && w.skills.includes(pos) && !used.has(w.id))
-     .sort(()=>Math.random()-.5)[0];
+ });
 
-   if(cand){a[pos]=cand;used.add(cand.id);}
-   else{a[pos]=pw;used.add(pw.id);}
- }
-
- return a;
+ const reserves = workers.filter(w=>!used.has(w.id));
+ return {assign,reserves};
 }
 
 /* GENERATE */
 
 genBtn.onclick = async ()=>{
 
- loading.style.display="flex";
- genBtn.disabled = true;
+ loadingEl.style.display="flex";
 
- const p1 = await buildPhase1();
- const p2 = rotate(p1);
- const p3 = rotate(p2);
- const p4 = rotate(p3);
+ await loadWorkers();
 
- phases=[p1,p2,p3,p4];
- render();
+ phases=[];
+ phaseReserves=[];
+ lastPosByWorker={};
 
- loading.style.display="none";
- genBtn.disabled = false;
-};
-
-/* RENDER */
-
-function render(){
-
- const labels = phaseLabels();
-
- let html = "<tr><th>Pozice</th>";
- labels.forEach(l=> html+=`<th>${l}</th>`);
- html+="</tr>";
-
- for(const pos of POSITIONS){
-   html+=`<tr><td class="posCol">${pos}</td>`;
-   phases.forEach(ph=>{
-     html+=`<td>${ph[pos] ? ph[pos].name : "—"}</td>`;
-   });
-   html+="</tr>";
+ for(let i=0;i<4;i++){
+   const {assign,reserves} = buildPhase();
+   phases.push(assign);
+   phaseReserves.push(reserves);
  }
 
- gridEl.innerHTML = html;
+ renderGrid();
+ renderReserves();
 
- reservesEl.innerHTML =
-  reserveWorkers.length
-   ? reserveWorkers.map(r=>r.name).join("<br>")
-   : "Nikdo";
+ loadingEl.style.display="none";
+};
+
+/* TIME LABELS */
+
+function phaseLabels(){
+ const s=shiftEl.value;
+ if(s==="ranni") return ["6-8","8-10","10-12","12-14"];
+ if(s==="odpo") return ["14-16","16-18","18-20","20-22"];
+ return ["22-00","00-02","02-04","04-06"];
 }
 
-/* SAVE */
+/* RENDER GRID */
 
-saveBtn.onclick = async ()=>{
+function renderGrid(){
 
- if(!phases.length){
-   alert("Nejdřív generuj");
-   return;
- }
+ const L = phaseLabels();
 
- const out = phases.map(ph=>{
-   const o={};
-   Object.entries(ph).forEach(([k,w])=>{
-     if(w) o[k]=w.id;
-   });
-   return o;
+ let html="<tr><th>Pozice</th>";
+ L.forEach(x=>html+=`<th>${x}</th>`);
+ html+="</tr>";
+
+ POSITIONS.forEach(pos=>{
+   html+=`<tr><td class="posCol">${pos}</td>`;
+   for(let p=0;p<4;p++){
+     const w=phases[p][pos];
+     html+=`<td class="slot" onclick="pick(${p},'${pos}')">${w?w.name:"—"}</td>`;
+   }
+   html+="</tr>";
  });
 
- await setDoc(doc(db,"shifts",dateEl.value+"_"+shiftEl.value),{
-  date:dateEl.value,
-  shift:shiftEl.value,
-  phases:out,
-  reserves:reserveWorkers.map(r=>r.id),
-  createdAt:Date.now()
- });
+ gridEl.innerHTML = html;
+}
 
- alert("Uloženo");
+/* RENDER RESERVES */
+
+function renderReserves(){
+
+ reservesBoxEl.innerHTML = phaseReserves.map((arr,i)=>{
+
+   const rows = arr.map(w=>
+     `<div><b>${w.name}</b> — ${w.skills.join(", ")}</div>`
+   ).join("");
+
+   return `<div class="resBox"><b>Fáze ${i+1}</b><br>${rows||"Nikdo"}</div>`;
+
+ }).join("");
+}
+
+/* PICK / SWAP */
+
+let pickPhaseIndex;
+let pickPosition;
+
+window.pick = (phase,pos)=>{
+
+ pickPhaseIndex=phase;
+ pickPosition=pos;
+
+ const list = phaseReserves[phase]
+   .filter(w=>w.skills.includes(pos));
+
+ pickTitle.innerText = pos;
+
+ pickList.innerHTML =
+   list.map(w=>
+     `<button class="pickBtn" onclick="swapWorker('${w.id}')">${w.name}</button>`
+   ).join("")
+ + `<button class="pickBtn removeBtn" onclick="removeWorker()">Vyprázdnit</button>`;
+
+ pickModal.style.display="flex";
 };
+
+window.swapWorker = (wid)=>{
+
+ const w = workers.find(x=>x.id===wid);
+ const cur = phases[pickPhaseIndex][pickPosition];
+
+ if(cur) phaseReserves[pickPhaseIndex].push(cur);
+
+ phases[pickPhaseIndex][pickPosition]=w;
+ phaseReserves[pickPhaseIndex] =
+   phaseReserves[pickPhaseIndex].filter(x=>x.id!==wid);
+
+ closePick();
+ renderGrid();
+ renderReserves();
+};
+
+window.removeWorker = ()=>{
+
+ const cur = phases[pickPhaseIndex][pickPosition];
+ if(cur) phaseReserves[pickPhaseIndex].push(cur);
+
+ phases[pickPhaseIndex][pickPosition]=null;
+
+ closePick();
+ renderGrid();
+ renderReserves();
+};
+
+window.closePick = ()=> pickModal.style.display="none";
 
 </script>
 </body>
