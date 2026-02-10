@@ -113,6 +113,26 @@ input, textarea{
   border-color:#22c55e;
   background:#052e1b;
 }
+.status-work{
+  background:#16a34a;
+  color:white;
+}
+
+.status-vacation{
+  background:#f59e0b;
+  color:black;
+}
+
+.status-sick,
+.status-paragraf{
+  background:#dc2626;
+  color:white;
+}
+
+.status-overtime{
+  background:#2563eb;
+  color:white;
+}
 
 .modal button{
   width:100%;
@@ -306,6 +326,19 @@ window.deleteEmp = async ()=>{
  modal.style.display="none";
  load();
 };
+/* tady */
+function paintStatusSelect(sel){
+
+  sel.classList.remove(
+    "status-work",
+    "status-vacation",
+    "status-sick",
+    "status-paragraf",
+    "status-overtime"
+  );
+
+  sel.classList.add("status-" + sel.value);
+}
 
 /* LIST */
 
@@ -330,11 +363,14 @@ async function load(){
 
   row.querySelector(".empName").onclick=()=>edit(d.id);
   const sel=row.querySelector("select");
-  sel.value=e.statusToday||"work";
+  sel.value=e.statusToday || "work";
+  paintStatusSelect(sel);
   sel.onchange=ev=>{
-    setDoc(doc(db,"employees",d.id),
-      {statusToday:ev.target.value},{merge:true});
-  };
+  paintStatusSelect(ev.target);
+  setDoc(doc(db,"employees",d.id),
+    {statusToday:ev.target.value},{merge:true});
+};
+
 
   list.appendChild(row);
  });
