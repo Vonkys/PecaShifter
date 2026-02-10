@@ -9,40 +9,26 @@
 body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 
 .topbar{
-  height:56px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 16px;
-  background:#020617;
-  border-bottom:1px solid #1f2937;
-}
-
-.topTitle{
-  font-weight:800;
-  font-size:18px;
+ height:56px;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ padding:0 16px;
+ background:#020617;
+ border-bottom:1px solid #1f2937;
 }
 
 .menuBtn{
-  padding:8px 14px;
-  border-radius:10px;
-  border:none;
-  font-weight:800;
-  background:#334155;
-  color:white;
-  cursor:pointer;
+ padding:8px 14px;
+ border-radius:10px;
+ border:none;
+ font-weight:800;
+ background:#334155;
+ color:white;
+ cursor:pointer;
 }
 
-.menuBtn:hover{
-  filter:brightness(1.15);
-}
-
-.menuBtn:active{
-  transform:scale(.96);
-}
-
-
-.container{padding:16px;max-width:1100px;margin:auto;}
+.container{padding:16px;max-width:1200px;margin:auto;}
 .card{background:#111827;padding:16px;border-radius:14px;margin-bottom:14px;}
 
 input,select{
@@ -56,6 +42,64 @@ button{
 
 .genBtn{background:#f59e0b;width:100%;}
 .saveBtn{background:#22c55e;width:100%;}
+
+/* LOCK PANEL */
+
+details{
+ background:#020617;
+ border-radius:10px;
+ padding:10px;
+ margin-top:10px;
+}
+
+details summary{
+ cursor:pointer;
+ font-weight:800;
+ margin-bottom:8px;
+}
+
+.lockList{
+ max-height:160px;
+ overflow:auto;
+ font-size:13px;
+}
+
+.lockList{
+ max-height:180px;
+ overflow:auto;
+ font-size:14px;
+ margin-top:8px;
+}
+
+.lockRow{
+ display:flex;
+ align-items:center;
+ gap:10px;
+ padding:6px 8px;
+ border-radius:8px;
+ cursor:pointer;
+}
+
+.lockRow:hover{
+ background:#1f2937;
+}
+
+.lockRow input{
+ width:18px;
+ height:18px;
+ cursor:pointer;
+}
+
+.lockCode{
+ font-weight:800;
+ width:72px;
+}
+
+.lockName{
+ opacity:.8;
+ font-size:13px;
+}
+
 
 /* TABLE */
 
@@ -101,15 +145,9 @@ td.slot:hover{background:#1f2937;}
 /* LOADING */
 
 .loading{
- position:fixed;
- inset:0;
- background:rgba(0,0,0,.75);
- display:none;
- align-items:center;
- justify-content:center;
- font-size:22px;
- font-weight:900;
- z-index:999;
+ position:fixed;inset:0;background:rgba(0,0,0,.75);
+ display:none;align-items:center;justify-content:center;
+ font-size:22px;font-weight:900;z-index:999;
 }
 </style>
 </head>
@@ -119,10 +157,8 @@ td.slot:hover{background:#1f2937;}
 <div class="loading" id="loading">🔍 Generuji směnu…</div>
 
 <div class="topbar">
-  <div class="topTitle">⚙️ Generátor směny</div>
-  <button class="menuBtn" onclick="location.href='index.html'">
-    Menu
-  </button>
+<div><b>⚙️ Generátor směny</b></div>
+<button class="menuBtn" onclick="location.href='index.html'">Menu</button>
 </div>
 
 <div class="container">
@@ -139,6 +175,11 @@ td.slot:hover{background:#1f2937;}
 <option value="noc">Noční</option>
 </select>
 
+<details>
+<summary>🔒 Vyřadit pozice z generování</summary>
+<div class="lockList" id="lockBox"></div>
+</details>
+
 <button class="genBtn" id="genBtn">⚙️ Generovat</button>
 
 </div>
@@ -152,11 +193,9 @@ td.slot:hover{background:#1f2937;}
 <div id="reservesBox"></div>
 </div>
 
-<button class="saveBtn">💾 Uložit</button>
+<button class="saveBtn" id="saveBtn">💾 Uložit</button>
 
 </div>
-
-<!-- PICK MODAL -->
 
 <div class="modal" id="pickModal">
  <div class="modalBox">
@@ -171,8 +210,6 @@ td.slot:hover{background:#1f2937;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, getDocs, doc, setDoc }
 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-/* FIREBASE */
 
 const app = initializeApp({
  apiKey:"AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
@@ -190,13 +227,12 @@ const shiftEl = document.getElementById("shift");
 const gridEl = document.getElementById("grid");
 const reservesBoxEl = document.getElementById("reservesBox");
 const genBtn = document.getElementById("genBtn");
-const saveBtn = document.querySelector(".saveBtn");
+const saveBtn = document.getElementById("saveBtn");
+const lockBox = document.getElementById("lockBox");
 
 const pickModal = document.getElementById("pickModal");
 const pickTitle = document.getElementById("pickTitle");
 const pickList = document.getElementById("pickList");
-
-/* DEFAULT DATE */
 
 dateEl.value = new Date().toISOString().slice(0,10);
 
@@ -210,20 +246,65 @@ const POSITIONS = [
 "VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
 ];
 
-/* STATE */
+/* LOCK LIST */
+
+const POS_LABELS = {
+"DP-L":"Doorprotector L",
+"DP-P":"Doorprotector P",
+"ZRC-L":"Zrcátka L",
+"ZRC-P":"Zrcátka P",
+"T-L":"Těsnění L",
+"T-P":"Těsnění P",
+"AGR-LP":"Agregát LP",
+"AGR-PP":"Agregát PP",
+"AGR-PZ":"Agregát PZ",
+"AGR-LZ":"Agregát LZ",
+"MOT-L":"Motory L",
+"MOT-P":"Motory P",
+"LEP-LP":"Lepení LP",
+"LEP-PP":"Lepení PP",
+"LEP-Z":"Lepení Z",
+"REPRO-L":"Repráky L",
+"REPRO-P":"Repráky P",
+"VYP1-L":"Výplně 1 L",
+"VYP1-P":"Výplně 1 P",
+"VYP2-L":"Výplně 2 L",
+"VYP2-P":"Výplně 2 P",
+"PR-L":"Přitahovač L",
+"PR-P":"Přitahovač P",
+"ZAM-L":"Zámky L",
+"ZAM-P":"Zámky P"
+};
+
+POSITIONS.forEach(p=>{
+ lockBox.innerHTML += `
+  <label class="lockRow">
+    <input type="checkbox" value="${p}">
+    <span class="lockCode">${p}</span>
+    <span class="lockName">${POS_LABELS[p]}</span>
+  </label>
+ `;
+});
+
+
+function activePositions(){
+ const locked = [...lockBox.querySelectorAll("input:checked")]
+   .map(x=>x.value);
+ return POSITIONS.filter(p=>!locked.includes(p));
+}
+
+/* DATA */
 
 let workers=[];
 let phases=[];
 let phaseReserves=[];
 let lastPosByWorker={};
 
-/* LOAD WORKERS */
+/* LOAD */
 
 async function loadWorkers(){
-
  const snap = await getDocs(collection(db,"employees"));
  workers=[];
-
  snap.forEach(d=>{
   const e=d.data();
   if(e.statusToday==="work"){
@@ -238,26 +319,30 @@ async function loadWorkers(){
 
 /* SMART PHASE */
 
-function buildPhase(){
-
- const map={};
- POSITIONS.forEach(p=>{
-   map[p]=workers.filter(w=>w.skills.includes(p));
- });
-
- const ordered=[...POSITIONS]
-   .sort((a,b)=>map[a].length-map[b].length);
+function buildPhase(activePos){
 
  const used=new Set();
  const assign={};
+
+ const map={};
+ activePos.forEach(p=>{
+   map[p]=workers.filter(w=>w.skills.includes(p));
+ });
+
+ const ordered=[...activePos]
+   .sort((a,b)=>map[a].length-map[b].length);
 
  ordered.forEach(pos=>{
 
   const pool = map[pos]
    .filter(w=>!used.has(w.id))
    .map(w=>{
-     const penalty = lastPosByWorker[w.id]===pos ? 0.25 : 1;
-     return {w,score:Math.random()*penalty};
+     const skillWeight = 1/(w.skills.length||1);
+     const rotatePenalty =
+       lastPosByWorker[w.id]===pos ? 0.3 : 1;
+     const score =
+       skillWeight*rotatePenalty + Math.random()*0.2;
+     return {w,score};
    })
    .sort((a,b)=>b.score-a.score);
 
@@ -281,23 +366,25 @@ genBtn.onclick = async ()=>{
 
  await loadWorkers();
 
+ const act = activePositions();
+
  phases=[];
  phaseReserves=[];
  lastPosByWorker={};
 
  for(let i=0;i<4;i++){
-   const {assign,reserves} = buildPhase();
+   const {assign,reserves}=buildPhase(act);
    phases.push(assign);
    phaseReserves.push(reserves);
  }
 
- renderGrid();
+ renderGrid(act);
  renderReserves();
 
  loadingEl.style.display="none";
 };
 
-/* TIME LABELS */
+/* RENDER */
 
 function phaseLabels(){
  const s=shiftEl.value;
@@ -306,9 +393,7 @@ function phaseLabels(){
  return ["22-00","00-02","02-04","04-06"];
 }
 
-/* RENDER GRID */
-
-function renderGrid(){
+function renderGrid(act){
 
  const L = phaseLabels();
 
@@ -316,7 +401,7 @@ function renderGrid(){
  L.forEach(x=>html+=`<th>${x}</th>`);
  html+="</tr>";
 
- POSITIONS.forEach(pos=>{
+ act.forEach(pos=>{
    html+=`<tr><td class="posCol">${pos}</td>`;
    for(let p=0;p<4;p++){
      const w=phases[p][pos];
@@ -325,84 +410,68 @@ function renderGrid(){
    html+="</tr>";
  });
 
- gridEl.innerHTML = html;
+ gridEl.innerHTML=html;
 }
-
-/* RENDER RESERVES */
 
 function renderReserves(){
-
- reservesBoxEl.innerHTML = phaseReserves.map((arr,i)=>{
-
-   const rows = arr.map(w=>
-     `<div><b>${w.name}</b> — ${w.skills.join(", ")}</div>`
-   ).join("");
-
-   return `<div class="resBox"><b>Fáze ${i+1}</b><br>${rows||"Nikdo"}</div>`;
-
- }).join("");
+ reservesBoxEl.innerHTML = phaseReserves.map((arr,i)=>
+  `<div class="resBox"><b>Fáze ${i+1}</b><br>`+
+  (arr.map(w=>w.name+" — "+w.skills.join(", ")).join("<br>")||"Nikdo")+
+  "</div>"
+ ).join("");
 }
 
-/* PICK / SWAP */
+/* PICK */
 
 let pickPhaseIndex;
 let pickPosition;
 
-window.pick = (phase,pos)=>{
-
+window.pick=(phase,pos)=>{
  pickPhaseIndex=phase;
  pickPosition=pos;
 
- const list = phaseReserves[phase]
-   .filter(w=>w.skills.includes(pos));
+ const list = phaseReserves[phase].filter(w=>w.skills.includes(pos));
 
- pickTitle.innerText = pos;
+ pickTitle.innerText = "Pozice: "+pos;
 
  pickList.innerHTML =
    list.map(w=>
-     `<button class="pickBtn" onclick="swapWorker('${w.id}')">${w.name}</button>`
-   ).join("")
- + `<button class="pickBtn removeBtn" onclick="removeWorker()">Vyprázdnit</button>`;
+    `<button class="pickBtn" onclick="swapWorker('${w.id}')">${w.name}</button>`
+   ).join("")+
+   `<button class="pickBtn removeBtn" onclick="removeWorker()">Vyprázdnit</button>`;
 
  pickModal.style.display="flex";
 };
 
-window.swapWorker = (wid)=>{
-
+window.swapWorker=(wid)=>{
  const w = workers.find(x=>x.id===wid);
  const cur = phases[pickPhaseIndex][pickPosition];
-
  if(cur) phaseReserves[pickPhaseIndex].push(cur);
-
  phases[pickPhaseIndex][pickPosition]=w;
  phaseReserves[pickPhaseIndex] =
-   phaseReserves[pickPhaseIndex].filter(x=>x.id!==wid);
-
+  phaseReserves[pickPhaseIndex].filter(x=>x.id!==wid);
  closePick();
- renderGrid();
+ renderGrid(activePositions());
  renderReserves();
 };
 
-window.removeWorker = ()=>{
-
+window.removeWorker=()=>{
  const cur = phases[pickPhaseIndex][pickPosition];
  if(cur) phaseReserves[pickPhaseIndex].push(cur);
-
  phases[pickPhaseIndex][pickPosition]=null;
-
  closePick();
- renderGrid();
+ renderGrid(activePositions());
  renderReserves();
 };
 
-window.closePick = ()=> pickModal.style.display="none";
+window.closePick=()=> pickModal.style.display="none";
 
 /* SAVE */
 
 saveBtn.onclick = async ()=>{
 
  if(!phases.length){
-   alert("Nejdřív generuj směnu");
+   alert("Nejdřív generuj");
    return;
  }
 
@@ -414,34 +483,16 @@ saveBtn.onclick = async ()=>{
    return o;
  });
 
- try{
+ await setDoc(doc(db,"shifts",dateEl.value+"_"+shiftEl.value),{
+   date:dateEl.value,
+   shift:shiftEl.value,
+   phases:out,
+   createdAt:Date.now()
+ });
 
-   await setDoc(
-     doc(db,"shifts", dateEl.value+"_"+shiftEl.value),
-     {
-       date: dateEl.value,
-       shift: shiftEl.value,
-       phases: out,
-       reserves: {
-       p1: phaseReserves[0].map(w=>w.id),
-       p2: phaseReserves[1].map(w=>w.id),
-       p3: phaseReserves[2].map(w=>w.id),
-       p4: phaseReserves[3].map(w=>w.id)
-     },
-       createdAt: Date.now()
-     }
-   );
-
-   alert("✅ Směna uložena");
-
- }catch(e){
-   console.error(e);
-   alert("❌ Uložení selhalo — zkontroluj Firestore rules");
- }
-
+ alert("✅ Uloženo");
 };
 
 </script>
-
 </body>
 </html>
