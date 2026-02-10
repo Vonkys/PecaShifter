@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generátor směny</title>
+
+<style>
+
+body{
+  margin:0;
+  font-family:system-ui, Arial;
+  background:#0f172a;
+  color:white;
+}
+
+/* ===== TOP BAR ===== */
+
+.topbar{
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px;
+  background:#020617;
+  border-bottom:1px solid #1f2937;
+}
+
+.backMini{
+  padding:8px 12px;
+  border-radius:10px;
+  border:none;
+  font-weight:800;
+  background:#334155;
+  color:white;
+}
+
+.topbarTitle{
+  font-weight:800;
+  font-size:14px;
+  opacity:.9;
+}
+
+/* ===== LAYOUT ===== */
+
+.container{
+  padding:16px;
+  max-width:820px;
+  margin:0 auto;
+}
+
+.card{
+  background:#111827;
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:14px;
+}
+
+label{
+  font-size:13px;
+  opacity:.8;
+}
+
+/* ===== INPUTS ===== */
+
+select,input{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:none;
+  margin-top:8px;
+  font-size:16px;
+}
+
+button{
+  padding:14px;
+  border-radius:12px;
+  border:none;
+  margin-top:8px;
+  font-size:16px;
+}
+.genBtn,
+.saveBtn{
+  width:100%;
+}
+
+
+.genBtn{
+  background:#f59e0b;
+  font-weight:900;
+}
+
+.saveBtn{
+  background:#22c55e;
+  font-weight:900;
+}
+
+/* ===== RESULT ===== */
+
+.posRow{
+  display:flex;
+  justify-content:space-between;
+  padding:8px 0;
+  border-bottom:1px solid #1f2937;
+  font-size:14px;
+}
+
+.posRow span:last-child{
+  font-weight:700;
+}
+
+.small{
+  opacity:.7;
+  font-size:13px;
+  line-height:1.5em;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- TOP BAR -->
+
+<div class="topbar">
+  <button class="backMini" onclick="location.href='index.html'">
+    ← Menu
+  </button>
+  <div class="topbarTitle">
+    Generátor směny
+  </div>
+</div>
+
+<!-- CONTENT -->
+
+<div class="container">
+
+<div class="card">
+
+<label>Datum</label>
+<input type="date" id="date">
+
+<label>Směna</label>
+<select id="shift">
+  <option value="ranni">Ranní (6–14)</option>
+  <option value="odpo">Odpolední (14–22)</option>
+  <option value="noc">Noční (22–6)</option>
+</select>
+
+<button class="genBtn" onclick="generate()">
+⚙️ Generovat obsazení
+</button>
+
+</div>
+
+<div class="card">
+<h4>Obsazené pozice (auto)</h4>
+<div id="result"></div>
+</div>
+
+<div class="card">
+<h4>Náhradníci</h4>
+<div id="reserves" class="small"></div>
+</div>
+
+<button class="saveBtn" onclick="saveShift()">
+💾 Uložit směnu
+</button>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+/* ===== FIREBASE ===== */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
+  authDomain: "shifter-ee3e6.firebaseapp.com",
+  projectId: "shifter-ee3e6"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* ===== DOM ===== */
+
+const dateEl = document.getElementById("date");
+const shiftEl = document.getElementById("shift");
+const resultEl = document.getElementById("result");
+const reservesEl = document.getElementById("reserves");
+
+/* ===== DEFAULT DATE ===== */
+
+dateEl.value = new Date().toISOString().slice(0,10);
+
+/* ===== POZICE ===== */
+
+const POSITIONS = [
+["DP-L","DOORPROTECTOR L"],["DP-P","DOORPROTECTOR P"],
+["ZRC-L","ZRCÁTKA L"],["ZRC-P","ZRCÁTKA P"],
+["T-L","TĚSNĚNÍ L"],["T-P","TĚSNĚNÍ P"],
+["AGR-LP","AGREGÁT LP"],["AGR-PP","AGREGÁT PP"],
+["AGR-PZ","AGREGÁT PZ"],["AGR-LZ","AGREGÁT LZ"],
+["MOT-L","MOTORY L"],["MOT-P","MOTORY P"],
+["LEP-LP","LEPENÍ LP"],["LEP-PP","LEPENÍ PP"],
+["LEP-Z","LEPENÍ Z"],
+["REPRO-L","REPRÁKY L"],["REPRO-P","REPRÁKY P"],
+["VYP1-L","VÝPLNĚ 1 L"],["VYP1-P","VÝPLNĚ 1 P"],
+["VYP2-L","VÝPLNĚ 2 L"],["VYP2-P","VÝPLNĚ 2 P"],
+["PR-L","PŘITAHOVAČ L"],["PR-P","PŘITAHOVAČ P"],
+["ZAM-L","ZÁMKY L"],["ZAM-P","ZÁMKY P"],
+["VET","VĚTRAČKY"],
+["INST","INSTALACE"]
+];
+
+/* ❌ ruční pozice */
+
+const AUTO_POSITIONS = POSITIONS.filter(p =>
+  p[0] !== "VET" && p[0] !== "INST"
+);
+
+let generated = {};
+let reserveList = [];
+
+/* ===== GENERATE ===== */
+
+window.generate = async ()=>{
+
+  resultEl.innerHTML = "Generuji…";
+  reservesEl.innerHTML = "";
+
+  const snap = await getDocs(collection(db,"employees"));
+
+  const workers = [];
+
+  snap.forEach(d=>{
+    const e = d.data();
+    if(e.statusToday === "work"){
+      workers.push({
+        id:d.id,
+        name: e.name + " " + e.surname,
+        skills: e.skills || []
+      });
+    }
+  });
+
+  const used = new Set();
+  generated = {};
+
+  for(const [code,label] of AUTO_POSITIONS){
+
+    const candidates = workers.filter(w =>
+      w.skills.includes(code) && !used.has(w.id)
+    );
+
+    if(candidates.length){
+      const pick = candidates[Math.floor(Math.random()*candidates.length)];
+      generated[code] = pick;
+      used.add(pick.id);
+    }else{
+      generated[code] = null;
+    }
+  }
+
+  reserveList = workers.filter(w => !used.has(w.id));
+
+  render();
+};
+
+/* ===== RENDER ===== */
+
+function render(){
+
+  resultEl.innerHTML = "";
+
+  for(const [code,label] of AUTO_POSITIONS){
+
+    const w = generated[code];
+
+    resultEl.innerHTML += `
+      <div class="posRow">
+        <span>${label}</span>
+        <span>${w ? w.name : "— NEOBSAZENO —"}</span>
+      </div>
+    `;
+  }
+
+  reservesEl.innerHTML =
+    reserveList.length
+      ? reserveList.map(r=>r.name).join("<br>")
+      : "Nikdo";
+}
+
+/* ===== SAVE ===== */
+
+window.saveShift = async ()=>{
+
+  if(!Object.keys(generated).length){
+    alert("Nejdřív generuj směnu");
+    return;
+  }
+
+  const id = dateEl.value + "_" + shiftEl.value;
+
+  const assignments = {};
+
+  Object.entries(generated).forEach(([pos,w])=>{
+    if(w) assignments[pos] = w.id;
+  });
+
+  await setDoc(doc(db,"shifts",id),{
+    date: dateEl.value,
+    shift: shiftEl.value,
+    assignments,
+    reserves: reserveList.map(r=>r.id),
+    createdAt: Date.now()
+  });
+
+  alert("Směna uložena");
+};
+
+</script>
+
+</body>
+</html>
