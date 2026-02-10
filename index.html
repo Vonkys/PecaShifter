@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PecaShifter</title>
+
+<style>
+
+body{
+  margin:0;
+  font-family: system-ui, Arial;
+  background: linear-gradient(160deg,#0f172a,#1e293b);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+}
+
+.app{ width:100%; max-width:420px; padding:20px; }
+
+.logo{
+  font-size:36px;
+  font-weight:800;
+  text-align:center;
+  margin-bottom:6px;
+}
+
+.sub{
+  text-align:center;
+  opacity:.7;
+  margin-bottom:24px;
+}
+
+.card{
+  background:#111827;
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:16px;
+  box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+input{
+  width:100%;
+  padding:14px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:12px;
+  font-size:16px;
+}
+
+button{
+  width:100%;
+  padding:16px;
+  border-radius:12px;
+  border:none;
+  font-size:16px;
+  font-weight:700;
+  cursor:pointer;
+  margin-top:10px;
+  transition:.15s;
+}
+
+button:active{ transform:scale(.98); }
+
+.loginBtn{ background:#22c55e; }
+.regBtn{ background:#f59e0b; color:#111; }
+.menuBtn{ background:#3b82f6; }
+.dark{ background:#374151; }
+
+.roleTag{
+  text-align:center;
+  margin-bottom:10px;
+  opacity:.8;
+}
+
+.hidden{ display:none; }
+
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div class="logo">PecaShifter</div>
+  <div class="sub">Směnový plánovací systém</div>
+
+  <div id="authBox" class="card">
+
+    <input id="email" placeholder="Email">
+    <input id="pass" type="password" placeholder="Heslo">
+
+    <button class="loginBtn" onclick="login()">Přihlásit</button>
+    <button class="regBtn" onclick="register()">Registrovat nový účet</button>
+
+  </div>
+
+  <div id="menuBox" class="card hidden">
+
+    <div class="roleTag" id="roleLabel"></div>
+
+    <button class="menuBtn adminOnly" onclick="go('employees.html')">👥 Karty zaměstnance</button>
+    <button class="menuBtn adminOnly" onclick="go('generator.html')">⚙️ Generátor</button>
+    <button class="menuBtn" onclick="go('schedule.html')">📊 Směnový graf</button>
+    <button class="menuBtn" onclick="go('stats.html')">📈 Statistiky</button>
+    <button class="dark" onclick="logout()">Odhlásit</button>
+
+  </div>
+
+</div>
+
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  onAuthStateChanged,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
+  authDomain: "shifter-ee3e6.firebaseapp.com",
+  projectId: "shifter-ee3e6",
+  storageBucket: "shifter-ee3e6.firebasestorage.app",
+  messagingSenderId: "288754692818",
+  appId: "1:288754692818:web:e072935fe7a31152c5f30b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const emailEl = document.getElementById("email");
+const passEl = document.getElementById("pass");
+const authBox = document.getElementById("authBox");
+const menuBox = document.getElementById("menuBox");
+const roleLabel = document.getElementById("roleLabel");
+
+
+window.login = async () => {
+  try{
+    const cred = await signInWithEmailAndPassword(auth,emailEl.value,passEl.value);
+
+    if(!cred.user.emailVerified){
+      alert("Neověřený email — zkontroluj schránku.");
+      await signOut(auth);
+      return;
+    }
+
+  }catch(e){
+
+    if(e.code === "auth/user-not-found"){
+      alert("Uživatel neexistuje. Klikni na Registraci.");
+    }
+    else if(e.code === "auth/wrong-password"){
+      alert("Špatné heslo.");
+    }
+    else{
+      alert("Chyba přihlášení.");
+    }
+  }
+};
+
+
+window.register = async () => {
+  try{
+
+    const cred = await createUserWithEmailAndPassword(
+      auth,emailEl.value,passEl.value
+    );
+
+    await setDoc(doc(db,"users",cred.user.uid),{ role:"user" });
+
+    await sendEmailVerification(cred.user);
+
+    alert("Účet vytvořen. Ověř email a pak se přihlas.");
+    await signOut(auth);
+
+  }catch(e){
+    alert("Registrace selhala: "+e.message);
+  }
+};
+
+
+window.logout = () => signOut(auth);
+window.go = (p)=> location.href=p;
+
+
+onAuthStateChanged(auth, async (user)=>{
+
+  if(!user){
+    authBox.classList.remove("hidden");
+    menuBox.classList.add("hidden");
+    return;
+  }
+
+  const snap = await getDoc(doc(db,"users",user.uid));
+  const role = snap.data()?.role || "user";
+
+  roleLabel.innerText = "Role: "+role;
+
+  if(role !== "admin"){
+    document.querySelectorAll(".adminOnly")
+      .forEach(b=>b.style.display="none");
+  }
+
+  authBox.classList.add("hidden");
+  menuBox.classList.remove("hidden");
+
+});
+
+</script>
+
+</body>
+</html>
