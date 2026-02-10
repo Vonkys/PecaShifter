@@ -21,24 +21,53 @@ body{
 .app{ width:100%; max-width:420px; padding:20px; }
 
 .logo{
-  font-size:36px;
-  font-weight:800;
+  font-size:34px;
+  font-weight:900;
   text-align:center;
-  margin-bottom:6px;
 }
 
 .sub{
   text-align:center;
   opacity:.7;
-  margin-bottom:24px;
+  margin-bottom:20px;
 }
 
 .card{
   background:#111827;
   border-radius:16px;
-  padding:18px;
-  margin-bottom:16px;
+  padding:20px;
   box-shadow:0 10px 25px rgba(0,0,0,.35);
+}
+
+.switch{
+  display:flex;
+  background:#1f2937;
+  border-radius:12px;
+  overflow:hidden;
+  margin-bottom:14px;
+}
+
+.switch button{
+  flex:1;
+  padding:12px;
+  border:none;
+  font-weight:800;
+  background:#374151;
+  color:white;
+  transition:.15s;
+}
+
+.switch button:hover{
+  background:#4b5563;
+}
+
+.activeTab{
+  background:#22c55e !important;
+  color:black !important;
+}
+
+.switch button:active{
+  transform:scale(.96);
 }
 
 input{
@@ -46,36 +75,66 @@ input{
   padding:14px;
   border-radius:10px;
   border:none;
-  margin-bottom:12px;
+  margin-bottom:10px;
   font-size:16px;
 }
 
-button{
+.mainBtn{
   width:100%;
   padding:16px;
   border-radius:12px;
   border:none;
   font-size:16px;
-  font-weight:700;
-  cursor:pointer;
-  margin-top:10px;
+  font-weight:900;
+  background:#3b82f6;
+  color:white;
   transition:.15s;
 }
 
-button:active{ transform:scale(.98); }
+.mainBtn:hover{ background:#2563eb; }
+.mainBtn:active{
+  transform:scale(.97);
+  filter:brightness(.85);
+}
 
-.loginBtn{ background:#22c55e; }
-.regBtn{ background:#f59e0b; color:#111; }
-.menuBtn{ background:#3b82f6; }
-.dark{ background:#374151; }
+.menu button{
+  width:100%;
+  padding:16px;
+  border-radius:14px;
+  border:none;
+  margin-top:12px;
+  font-weight:800;
+  transition:.15s;
+  color:white;
+}
+
+.btnEmployees{ background:#7c3aed; }
+.btnGenerator{ background:#f59e0b; }
+.btnSchedule{ background:#16a34a; }
+.btnStats{ background:#06b6d4; }
+.logout{ background:#374151; }
+
+.menu button:hover{
+  filter:brightness(1.1);
+}
+
+.menu button:active{
+  transform:scale(.97);
+  filter:brightness(.85);
+}
+
+
+.logout{
+  background:#374151 !important;
+}
+
+.hidden{ display:none; }
 
 .roleTag{
   text-align:center;
   margin-bottom:10px;
   opacity:.8;
 }
-
-.hidden{ display:none; }
 
 </style>
 </head>
@@ -84,30 +143,59 @@ button:active{ transform:scale(.98); }
 
 <div class="app">
 
-  <div class="logo">PecaShifter</div>
-  <div class="sub">Směnový plánovací systém</div>
+<div class="logo">PecaShifter</div>
+<div class="sub">Směnový plánovací systém</div>
 
-  <div id="authBox" class="card">
+<div id="authCard" class="card">
 
-    <input id="email" placeholder="Email">
-    <input id="pass" type="password" placeholder="Heslo">
-
-    <button class="loginBtn" onclick="login()">Přihlásit</button>
-    <button class="regBtn" onclick="register()">Registrovat nový účet</button>
-
+  <div class="switch">
+    <button id="tabLogin" class="activeTab" onclick="setMode('login')">Přihlášení</button>
+    <button id="tabReg" onclick="setMode('register')">Registrace</button>
   </div>
 
-  <div id="menuBox" class="card hidden">
+  <input id="email" placeholder="Email">
+  <input id="pass" type="password" placeholder="Heslo">
 
-    <div class="roleTag" id="roleLabel"></div>
+  <button class="mainBtn" id="mainBtn" onclick="submitAuth()">
+    Přihlásit
+  </button>
 
-    <button class="menuBtn adminOnly" onclick="go('employees.html')">👥 Karty zaměstnance</button>
-    <button class="menuBtn adminOnly" onclick="go('generator.html')">⚙️ Generátor</button>
-    <button class="menuBtn" onclick="go('schedule.html')">📊 Směnový graf</button>
-    <button class="menuBtn" onclick="go('stats.html')">📈 Statistiky</button>
-    <button class="dark" onclick="logout()">Odhlásit</button>
+</div>
 
-  </div>
+<div id="menuCard" class="card hidden">
+
+  <div class="roleTag" id="roleLabel"></div>
+
+  <div class="menu">
+
+<button class="btnEmployees adminOnly"
+onclick="go('employees.html')">
+👥 Karty zaměstnance
+</button>
+
+<button class="btnGenerator adminOnly"
+onclick="go('generator.html')">
+⚙️ Generátor
+</button>
+
+<button class="btnSchedule"
+onclick="go('schedule.html')">
+📊 Směnový graf
+</button>
+
+<button class="btnStats"
+onclick="go('stats.html')">
+📈 Statistiky
+</button>
+
+<button class="logout"
+onclick="logout()">
+Odhlásit
+</button>
+
+</div>
+
+
 
 </div>
 
@@ -119,7 +207,6 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   onAuthStateChanged,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -130,6 +217,7 @@ import {
   getDoc,
   setDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
@@ -144,67 +232,71 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const emailEl = document.getElementById("email");
-const passEl = document.getElementById("pass");
-const authBox = document.getElementById("authBox");
-const menuBox = document.getElementById("menuBox");
-const roleLabel = document.getElementById("roleLabel");
+let mode = "login";
 
+window.setMode = (m)=>{
+  mode = m;
+  tabLogin.classList.toggle("activeTab", m==="login");
+  tabReg.classList.toggle("activeTab", m==="register");
+  mainBtn.innerText = m==="login" ? "Přihlásit" : "Registrovat";
+};
 
-window.login = async () => {
+window.submitAuth = async ()=>{
+
+  const email = emailEl.value;
+  const pass = passEl.value;
+
   try{
-    const cred = await signInWithEmailAndPassword(auth,emailEl.value,passEl.value);
 
-    if(!cred.user.emailVerified){
-      alert("Neověřený email — zkontroluj schránku.");
-      await signOut(auth);
+    if(mode==="login"){
+      await signInWithEmailAndPassword(auth,email,pass);
+    }else{
+      const cred = await createUserWithEmailAndPassword(auth,email,pass);
+      await setDoc(doc(db,"users",cred.user.uid),{role:"user"});
+      alert("Registrace proběhla");
+      setMode("login");
       return;
     }
 
   }catch(e){
 
-    if(e.code === "auth/user-not-found"){
-      alert("Uživatel neexistuje. Klikni na Registraci.");
+    if(
+      e.code==="auth/user-not-found" ||
+      e.code==="auth/wrong-password" ||
+      e.code==="auth/invalid-credential"
+    ){
+      alert("Neplatné přihlášení — účet neexistuje nebo špatné heslo.");
     }
-    else if(e.code === "auth/wrong-password"){
-      alert("Špatné heslo.");
+
+    else if(e.code==="auth/email-already-in-use"){
+      alert("Tento email už je registrovaný.");
     }
+
+    else if(e.code==="auth/weak-password"){
+      alert("Heslo musí mít aspoň 6 znaků.");
+    }
+
     else{
       alert("Chyba přihlášení.");
     }
   }
 };
 
-
-window.register = async () => {
-  try{
-
-    const cred = await createUserWithEmailAndPassword(
-      auth,emailEl.value,passEl.value
-    );
-
-    await setDoc(doc(db,"users",cred.user.uid),{ role:"user" });
-
-    await sendEmailVerification(cred.user);
-
-    alert("Účet vytvořen. Ověř email a pak se přihlas.");
-    await signOut(auth);
-
-  }catch(e){
-    alert("Registrace selhala: "+e.message);
-  }
-};
-
-
-window.logout = () => signOut(auth);
+window.logout = ()=> signOut(auth);
 window.go = (p)=> location.href=p;
 
+const emailEl = document.getElementById("email");
+const passEl = document.getElementById("pass");
+const authCard = document.getElementById("authCard");
+const menuCard = document.getElementById("menuCard");
+const roleLabel = document.getElementById("roleLabel");
 
-onAuthStateChanged(auth, async (user)=>{
+
+onAuthStateChanged(auth, async user=>{
 
   if(!user){
-    authBox.classList.remove("hidden");
-    menuBox.classList.add("hidden");
+    authCard.classList.remove("hidden");
+    menuCard.classList.add("hidden");
     return;
   }
 
@@ -213,13 +305,13 @@ onAuthStateChanged(auth, async (user)=>{
 
   roleLabel.innerText = "Role: "+role;
 
-  if(role !== "admin"){
+  if(role!=="admin"){
     document.querySelectorAll(".adminOnly")
       .forEach(b=>b.style.display="none");
   }
 
-  authBox.classList.add("hidden");
-  menuBox.classList.remove("hidden");
+  authCard.classList.add("hidden");
+  menuCard.classList.remove("hidden");
 
 });
 
