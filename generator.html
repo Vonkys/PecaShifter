@@ -139,7 +139,7 @@ td.slot:hover{background:#1f2937;}
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs }
+import { getFirestore, collection, getDocs, doc, setDoc }
 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 /* FIREBASE */
@@ -160,6 +160,13 @@ const shiftEl = document.getElementById("shift");
 const gridEl = document.getElementById("grid");
 const reservesBoxEl = document.getElementById("reservesBox");
 const genBtn = document.getElementById("genBtn");
+const saveBtn = document.querySelector(".saveBtn");
+
+const pickModal = document.getElementById("pickModal");
+const pickTitle = document.getElementById("pickTitle");
+const pickList = document.getElementById("pickList");
+
+/* DEFAULT DATE */
 
 dateEl.value = new Date().toISOString().slice(0,10);
 
@@ -172,6 +179,8 @@ const POSITIONS = [
 "REPRO-L","REPRO-P","VYP1-L","VYP1-P",
 "VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
 ];
+
+/* STATE */
 
 let workers=[];
 let phases=[];
@@ -358,6 +367,51 @@ window.removeWorker = ()=>{
 
 window.closePick = ()=> pickModal.style.display="none";
 
+/* SAVE */
+
+saveBtn.onclick = async ()=>{
+
+ if(!phases.length){
+   alert("Nejdřív generuj směnu");
+   return;
+ }
+
+ const out = phases.map(ph=>{
+   const o={};
+   Object.entries(ph).forEach(([pos,w])=>{
+     if(w) o[pos]=w.id;
+   });
+   return o;
+ });
+
+ try{
+
+   await setDoc(
+     doc(db,"shifts", dateEl.value+"_"+shiftEl.value),
+     {
+       date: dateEl.value,
+       shift: shiftEl.value,
+       phases: out,
+       reserves: {
+       p1: phaseReserves[0].map(w=>w.id),
+       p2: phaseReserves[1].map(w=>w.id),
+       p3: phaseReserves[2].map(w=>w.id),
+       p4: phaseReserves[3].map(w=>w.id)
+     },
+       createdAt: Date.now()
+     }
+   );
+
+   alert("✅ Směna uložena");
+
+ }catch(e){
+   console.error(e);
+   alert("❌ Uložení selhalo — zkontroluj Firestore rules");
+ }
+
+};
+
 </script>
+
 </body>
 </html>
