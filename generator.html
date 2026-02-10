@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -268,16 +269,31 @@ const POSITIONS = [
 "AGR-LP","AGR-PP","AGR-PZ","AGR-LZ",
 "MOT-L","MOT-P","LEP-LP","LEP-PP","LEP-Z",
 "REPRO-L","REPRO-P","VYP1-L","VYP1-P",
-"VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P","VET","INST","JINE",
+"VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P","VET","VET2","INST",
+"INST2","JINE","JINE2",
+
 ];
 
+/* DEFAULT ZAMČENÉ POZICE */
+
+const DEFAULT_LOCKED = new Set([
+ "ZAM-L","ZAM-P",
+ "VET","VET2",
+ "INST","INST2",
+ "JINE","JINE2"
+]);
+
 POSITIONS.forEach(p=>{
+
+ const checked = DEFAULT_LOCKED.has(p) ? "checked" : "";
+
  lockBox.innerHTML += `
  <label class="lockRow">
-  <input type="checkbox" value="${p}">
+  <input type="checkbox" value="${p}" ${checked}>
   <span>${p}</span>
  </label>`;
 });
+
 
 function lockedPositions(){
  return [...lockBox.querySelectorAll("input:checked")].map(x=>x.value);
@@ -504,3 +520,4 @@ saveBtn.onclick = async ()=>{
 </script>
 </body>
 </html>
+ 
