@@ -114,11 +114,6 @@ input, textarea{
   background:#052e1b;
 }
 
-.skillItem input{
-  margin-right:6px;
-}
-
-
 .modal button{
   width:100%;
   padding:14px;
@@ -143,14 +138,9 @@ input, textarea{
 </div>
 
 <div class="container">
-
 <button class="addBtn" onclick="openNew()">+ Přidat zaměstnance</button>
-
 <div id="list"></div>
-
 </div>
-
-<!-- MODAL -->
 
 <div id="modal" class="modal">
   <div class="modalBox">
@@ -168,7 +158,7 @@ input, textarea{
       <option value="vacation">Dovolená</option>
       <option value="paragraf">Paragraf</option>
       <option value="sick">Nemoc</option>
-      <option value="overtime">Přesčas z jiné směny</option>
+      <option value="overtime">Přesčas</option>
     </select>
 
     <button class="save" onclick="saveEmp()">Uložit</button>
@@ -181,6 +171,9 @@ input, textarea{
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged }
+from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
 import {
   getFirestore,
   collection,
@@ -191,16 +184,25 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-const firebaseConfig = {
+const app = initializeApp({
   apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
   authDomain: "shifter-ee3e6.firebaseapp.com",
   projectId: "shifter-ee3e6"
-};
+});
 
-const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* DOM refs — KRITICKÉ */
+/* 🔒 musí být přihlášen */
+
+onAuthStateChanged(auth, u=>{
+  if(!u){
+    alert("Nejsi přihlášen");
+    location.href="index.html";
+  }
+});
+
+/* DOM */
 
 const modal = document.getElementById("modal");
 const skillsBox = document.getElementById("skillsBox");
@@ -211,7 +213,7 @@ const lNameEl = document.getElementById("lName");
 const infoEl = document.getElementById("info");
 const statusEl = document.getElementById("status");
 
-/* positions */
+/* pozice */
 
 const POSITIONS = [
 ["DP-L","DOORPROTECTOR L"],["DP-P","DOORPROTECTOR P"],
@@ -230,55 +232,47 @@ const POSITIONS = [
 ["VET","VĚTRAČKY"],["INST","INSTALACE"]
 ];
 
-let editId = null;
-
-/* skills render */
-
 POSITIONS.forEach(p=>{
-  const div = document.createElement("div");
-  div.className = "skillItem";
-  div.innerHTML = `<input type="checkbox" value="${p[0]}"> ${p[1]}`;
-
-  div.onclick = (e)=>{
-    if(e.target.tagName !== "INPUT"){
-      const cb = div.querySelector("input");
-      cb.checked = !cb.checked;
-    }
-    div.classList.toggle("active", div.querySelector("input").checked);
+  const div=document.createElement("div");
+  div.className="skillItem";
+  div.innerHTML=`<input type="checkbox" value="${p[0]}"> ${p[1]}`;
+  div.onclick=()=>{
+    const cb=div.querySelector("input");
+    cb.checked=!cb.checked;
+    div.classList.toggle("active",cb.checked);
   };
-
   skillsBox.appendChild(div);
 });
 
-/* ===== ACTIONS ===== */
+let editId=null;
 
-window.openNew = ()=>{
+window.openNew=()=>{
   editId=null;
   fNameEl.value="";
   lNameEl.value="";
   infoEl.value="";
   statusEl.value="work";
-
   skillsBox.querySelectorAll("input").forEach(c=>{
     c.checked=false;
     c.parentElement.classList.remove("active");
   });
-
   modal.style.display="block";
 };
 
-window.closeModal = ()=> modal.style.display="none";
+window.closeModal=()=> modal.style.display="none";
 
 /* SAVE */
 
 window.saveEmp = async ()=>{
+
+ try{
 
   if(!fNameEl.value || !lNameEl.value){
     alert("Vyplň jméno a příjmení");
     return;
   }
 
-  const skills = [...skillsBox.querySelectorAll("input:checked")]
+  const skills=[...skillsBox.querySelectorAll("input:checked")]
     .map(x=>x.value);
 
   const id = editId || (fNameEl.value+"_"+lNameEl.value)
@@ -292,80 +286,78 @@ window.saveEmp = async ()=>{
     statusToday:statusEl.value
   });
 
+  alert("Uloženo");
   modal.style.display="none";
   load();
+
+ }catch(e){
+  alert("CHYBA: "+e.message);
+  console.error(e);
+ }
+
 };
 
 /* DELETE */
 
 window.deleteEmp = async ()=>{
-  if(!editId) return;
-  await deleteDoc(doc(db,"employees",editId));
-  modal.style.display="none";
-  load();
+ if(!editId) return;
+ await deleteDoc(doc(db,"employees",editId));
+ alert("Smazáno");
+ modal.style.display="none";
+ load();
 };
 
 /* LIST */
 
 async function load(){
-  list.innerHTML="";
-  const snap = await getDocs(collection(db,"employees"));
+ list.innerHTML="";
+ const snap = await getDocs(collection(db,"employees"));
 
-  snap.forEach(d=>{
-    const e = d.data();
+ snap.forEach(d=>{
+  const e=d.data();
+  const row=document.createElement("div");
+  row.className="empRow";
+  row.innerHTML=`
+   <div class="empName">${e.name} ${e.surname}</div>
+   <select>
+     <option value="work">Práce</option>
+     <option value="vacation">Dovolená</option>
+     <option value="paragraf">Paragraf</option>
+     <option value="sick">Nemoc</option>
+     <option value="overtime">Přesčas</option>
+   </select>
+  `;
 
-    const row = document.createElement("div");
-    row.className="empRow";
+  row.querySelector(".empName").onclick=()=>edit(d.id);
+  const sel=row.querySelector("select");
+  sel.value=e.statusToday||"work";
+  sel.onchange=ev=>{
+    setDoc(doc(db,"employees",d.id),
+      {statusToday:ev.target.value},{merge:true});
+  };
 
-    row.innerHTML = `
-      <div class="empName">${e.name} ${e.surname}</div>
-      <select>
-        <option value="work">Práce</option>
-        <option value="vacation">Dovolená</option>
-        <option value="paragraf">Paragraf</option>
-        <option value="sick">Nemoc</option>
-        <option value="overtime">Přesčas</option>
-      </select>
-    `;
-
-    row.querySelector(".empName").onclick = ()=> edit(d.id);
-    row.querySelector("select").value = e.statusToday || "work";
-
-    row.querySelector("select").onchange = async (ev)=>{
-      await setDoc(doc(db,"employees",d.id),
-        {statusToday:ev.target.value},
-        {merge:true});
-    };
-
-    list.appendChild(row);
-  });
+  list.appendChild(row);
+ });
 }
 
-/* EDIT */
-
 async function edit(id){
-  const snap = await getDoc(doc(db,"employees",id));
-  const e = snap.data();
-
-  editId=id;
-  modal.style.display="block";
-
-  fNameEl.value=e.name;
-  lNameEl.value=e.surname;
-  infoEl.value=e.info;
-  statusEl.value=e.statusToday || "work";
-
-  skillsBox.querySelectorAll("input").forEach(c=>{
-    c.checked = e.skills?.includes(c.value);
-    c.parentElement.classList.toggle("active", c.checked);
-  });
+ const snap=await getDoc(doc(db,"employees",id));
+ const e=snap.data();
+ editId=id;
+ modal.style.display="block";
+ fNameEl.value=e.name;
+ lNameEl.value=e.surname;
+ infoEl.value=e.info;
+ statusEl.value=e.statusToday||"work";
+ skillsBox.querySelectorAll("input").forEach(c=>{
+   c.checked=e.skills?.includes(c.value);
+   c.parentElement.classList.toggle("active",c.checked);
+ });
 }
 
 load();
 
 </script>
-
-
 
 </body>
 </html>
