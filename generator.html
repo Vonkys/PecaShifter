@@ -328,74 +328,91 @@ async function loadWorkers(){
 
 function buildPhase(act){
 
- const MAX_TRIES = 200;
+ const assign = {};
+ const used = new Set();
 
- for(let attempt=0; attempt<MAX_TRIES; attempt++){
+ // kolik lidí umí pozici
+ const map = {};
+ act.forEach(pos=>{
+   map[pos] = workers.filter(w=>w.skills.includes(pos));
+ });
 
-   const used = new Set();
-   const assign = {};
-   let ok = true;
+ // nejtěžší pozice první
+ const orderedPos = [...act].sort(
+   (a,b)=> map[a].length - map[b].length
+ );
 
-   // seřadit od nejtěžších pozic
-   const ordered=[...act].sort((a,b)=>
-     workers.filter(w=>w.skills.includes(a)).length -
-     workers.filter(w=>w.skills.includes(b)).length
-   );
+ for(const pos of orderedPos){
 
-   for(const pos of ordered){
+   const pool = map[pos].filter(w=>!used.has(w.id));
 
-     const pool = workers
-       .filter(w=>w.skills.includes(pos) && !used.has(w.id));
-
-     if(!pool.length){
-       ok = false;
-       break;
-     }
-
-     const pick = pool[Math.floor(Math.random()*pool.length)];
-     assign[pos] = pick;
-     used.add(pick.id);
+   if(!pool.length){
+     return null;
    }
 
-   if(ok){
-     const reserves = workers.filter(w=>!used.has(w.id));
-     return {assign,reserves};
-   }
+   const scored = pool.map(w=>{
 
+     // méně skillů = větší priorita
+     const specScore = 1 / (w.skills.length || 1);
+
+     // penalizace pokud byl na stejné pozici minule
+     const rotatePenalty =
+       lastPosByWorker[w.id] === pos ? 0.25 : 1;
+
+     const score =
+       specScore * rotatePenalty +
+       Math.random()*0.05;
+
+     return {w,score};
+   });
+
+   scored.sort((a,b)=>b.score-a.score);
+
+   const pick = scored[0].w;
+
+   assign[pos] = pick;
+   used.add(pick.id);
+   lastPosByWorker[pick.id] = pos;
  }
 
- // když se nepovedlo složit
- return null;
+ const reserves = workers.filter(w=>!used.has(w.id));
+ return {assign,reserves};
 }
 
 
 /* GENERATE */
 
 genBtn.onclick = async ()=>{
+
  loadingEl.style.display="flex";
+
  await loadWorkers();
 
- phases=[]; phaseReserves=[];
- const act=activePositions();
+ const act = activePositions();   // ← TOHLE CHYBÍ
+
+ phases = [];
+ phaseReserves = [];
+ lastPosByWorker = {};
 
  for(let i=0;i<4;i++){
 
- const result = buildPhase(act);
+   const res = buildPhase(act);
 
- if(!result){
-   loadingEl.style.display="none";
-   alert("❌ Nelze obsadit všechny pozice — málo lidí nebo skills");
-   return;
+   if(!res){
+     alert("❌ Nelze obsadit všechny pozice — málo lidí / skillů");
+     loadingEl.style.display="none";
+     return;
+   }
+
+   phases.push(res.assign);
+   phaseReserves.push(res.reserves);
  }
 
- phases.push(result.assign);
- phaseReserves.push(result.reserves);
-}
-
-
  render();
+
  loadingEl.style.display="none";
 };
+
 
 /* LOAD */
 
