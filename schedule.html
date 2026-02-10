@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Směnový graf</title>
+
+<style>
+
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#0f172a;
+  color:white;
+}
+
+.topbar{
+  height:50px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px;
+  background:#020617;
+}
+
+.container{
+  padding:16px;
+  max-width:1000px;
+  margin:auto;
+}
+
+.card{
+  background:#111827;
+  padding:16px;
+  border-radius:14px;
+  margin-bottom:14px;
+}
+
+input,select{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-top:6px;
+}
+
+/* TABLE */
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+}
+
+th,td{
+  padding:10px;
+  border-bottom:1px solid #1f2937;
+  text-align:center;
+}
+
+th{
+  background:#020617;
+}
+
+.posCol{
+  text-align:left;
+  font-weight:800;
+  background:#020617;
+}
+
+.highlight{
+  background:#064e3b;
+  font-weight:900;
+}
+
+.empty{
+  opacity:.4;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+<div>📊 Směnový graf</div>
+<button onclick="location.href='index.html'">Menu</button>
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<label>Datum</label>
+<input type="date" id="date">
+
+<label>Směna</label>
+<select id="shift">
+<option value="ranni">Ranní</option>
+<option value="odpo">Odpolední</option>
+<option value="noc">Noční</option>
+</select>
+
+<label>Filtrovat jméno</label>
+<input id="nameFilter" placeholder="např. Pepa">
+
+</div>
+
+<div class="card">
+<table id="grid"></table>
+</div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, doc, getDoc, collection, getDocs }
+from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+/* FIREBASE */
+
+const app = initializeApp({
+ apiKey:"AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
+ authDomain:"shifter-ee3e6.firebaseapp.com",
+ projectId:"shifter-ee3e6"
+});
+
+const db = getFirestore(app);
+
+/* DOM */
+
+const dateEl = document.getElementById("date");
+const shiftEl = document.getElementById("shift");
+const nameFilterEl = document.getElementById("nameFilter");
+const gridEl = document.getElementById("grid");
+
+dateEl.value = new Date().toISOString().slice(0,10);
+
+/* POZICE */
+
+const POSITIONS = [
+"DP-L","DP-P","ZRC-L","ZRC-P","T-L","T-P",
+"AGR-LP","AGR-PP","AGR-PZ","AGR-LZ",
+"MOT-L","MOT-P","LEP-LP","LEP-PP","LEP-Z",
+"REPRO-L","REPRO-P","VYP1-L","VYP1-P",
+"VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
+];
+
+let workerMap = {}; // id -> name
+let phasesData = [];
+
+/* LOAD WORKERS MAP */
+
+async function loadWorkers(){
+
+ const snap = await getDocs(collection(db,"employees"));
+ workerMap = {};
+
+ snap.forEach(d=>{
+  const e=d.data();
+  workerMap[d.id] = e.name;
+ });
+}
+
+/* TIME LABELS */
+
+function phaseLabels(){
+ const s = shiftEl.value;
+ if(s==="ranni") return ["6-8","8-10","10-12","12-14"];
+ if(s==="odpo") return ["14-16","16-18","18-20","20-22"];
+ return ["22-00","00-02","02-04","04-06"];
+}
+
+/* LOAD SHIFT */
+
+async function loadShift(){
+
+ const id = dateEl.value + "_" + shiftEl.value;
+
+ const snap = await getDoc(doc(db,"shifts",id));
+
+ if(!snap.exists()){
+   gridEl.innerHTML = "<tr><td>Směna nenalezena</td></tr>";
+   return;
+ }
+
+ phasesData = snap.data().phases;
+ render();
+}
+
+/* RENDER */
+
+function render(){
+
+ const filter = nameFilterEl.value.toLowerCase().trim();
+ const labels = phaseLabels();
+
+ let html = "<tr><th>Pozice</th>";
+ labels.forEach(l=> html+=`<th>${l}</th>`);
+ html+="</tr>";
+
+ POSITIONS.forEach(pos=>{
+
+   const names = phasesData.map(ph=>{
+     const wid = ph[pos];
+     return wid ? workerMap[wid] || "?" : "";
+   });
+
+   // filtr — zobraz jen když tam ten člověk někde je
+   if(filter){
+     if(!names.some(n=>n.toLowerCase().includes(filter))){
+       return;
+     }
+   }
+
+   html += `<tr><td class="posCol">${pos}</td>`;
+
+   names.forEach(n=>{
+     if(!n){
+       html+=`<td class="empty">—</td>`;
+     }else if(filter && n.toLowerCase().includes(filter)){
+       html+=`<td class="highlight">${n}</td>`;
+     }else{
+       html+=`<td>${n}</td>`;
+     }
+   });
+
+   html+="</tr>";
+
+ });
+
+ gridEl.innerHTML = html;
+}
+
+/* EVENTS */
+
+dateEl.onchange = loadShift;
+shiftEl.onchange = loadShift;
+nameFilterEl.oninput = render;
+
+/* INIT */
+
+await loadWorkers();
+await loadShift();
+
+</script>
+
+</body>
+</html>
