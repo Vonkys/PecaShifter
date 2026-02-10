@@ -129,10 +129,11 @@ input, textarea{
   color:white;
 }
 
-.status-overtime{
+.status-shitmaking{
   background:#2563eb;
   color:white;
 }
+
 
 .topbar{
   height:56px;
@@ -213,7 +214,7 @@ input, textarea{
       <option value="vacation">Dovolená</option>
       <option value="paragraf">Paragraf</option>
       <option value="sick">Nemoc</option>
-      <option value="overtime">Přesčas</option>
+      <option value="shitmaking">Shit making</option>
     </select>
 
     <button class="save" onclick="saveEmp()">Uložit</button>
@@ -365,12 +366,12 @@ window.deleteEmp = async ()=>{
 function paintStatusSelect(sel){
 
   sel.classList.remove(
-    "status-work",
-    "status-vacation",
-    "status-sick",
-    "status-paragraf",
-    "status-overtime"
-  );
+  "status-work",
+  "status-vacation",
+  "status-sick",
+  "status-paragraf",
+  "status-shitmaking"
+);
 
   sel.classList.add("status-" + sel.value);
 }
@@ -392,7 +393,7 @@ async function load(){
      <option value="vacation">Dovolená</option>
      <option value="paragraf">Paragraf</option>
      <option value="sick">Nemoc</option>
-     <option value="overtime">Přesčas</option>
+     <option value="shitmaking">Shit making</option>
    </select>
   `;
 
