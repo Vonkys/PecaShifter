@@ -6,7 +6,6 @@
 <title>Generátor směny</title>
 
 <style>
-
 body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 
 .topbar{
@@ -37,46 +36,41 @@ button{padding:12px;border-radius:10px;border:none;margin-top:10px;}
 .genBtn{background:#f59e0b;font-weight:900;width:100%;}
 .saveBtn{background:#22c55e;font-weight:900;width:100%;}
 
-/* ===== TABLE ===== */
+/* TABLE */
 
-.tableWrap{
- overflow:auto;
- border-radius:12px;
- border:1px solid #1f2937;
-}
+.tableWrap{overflow:auto;border-radius:12px;border:1px solid #1f2937;}
 
-table{
- width:100%;
- border-collapse:collapse;
- font-size:13px;
-}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{padding:8px;border-bottom:1px solid #1f2937;text-align:center;}
 
-th,td{
- padding:8px;
- border-bottom:1px solid #1f2937;
- text-align:center;
-}
-
-th{
- background:#020617;
- position:sticky;
- top:0;
-}
-
+th{background:#020617;position:sticky;top:0;}
 .posCol{
- text-align:left;
- font-weight:800;
+ text-align:left;font-weight:800;
  background:#020617;
- position:sticky;
- left:0;
+ position:sticky;left:0;
 }
 
 .small{opacity:.7;font-size:13px;}
 
+/* LOADING */
+
+.loading{
+ position:fixed;
+ inset:0;
+ background:rgba(0,0,0,.7);
+ display:none;
+ align-items:center;
+ justify-content:center;
+ font-size:22px;
+ font-weight:900;
+ z-index:999;
+}
 </style>
 </head>
 
 <body>
+
+<div class="loading" id="loading">🔍 Generuji obsazení…</div>
 
 <div class="topbar">
 <button class="backMini" onclick="location.href='index.html'">← Menu</button>
@@ -86,7 +80,6 @@ th{
 <div class="container">
 
 <div class="card">
-
 <label>Datum</label>
 <input type="date" id="date">
 
@@ -97,8 +90,7 @@ th{
 <option value="noc">Noční</option>
 </select>
 
-<button class="genBtn" onclick="generate()">⚙️ Obsadit pozice</button>
-
+<button class="genBtn" id="genBtn">⚙️ Obsadit pozice</button>
 </div>
 
 <div class="card">
@@ -113,7 +105,7 @@ th{
 <div id="reserves" class="small"></div>
 </div>
 
-<button class="saveBtn" onclick="saveShift()">💾 Uložit směnu</button>
+<button class="saveBtn" id="saveBtn">💾 Uložit směnu</button>
 
 </div>
 
@@ -131,60 +123,98 @@ const app = initializeApp({
 
 const db = getFirestore(app);
 
+/* DOM */
+
+const dateEl = document.getElementById("date");
+const shiftEl = document.getElementById("shift");
+const gridEl = document.getElementById("grid");
+const reservesEl = document.getElementById("reserves");
+const genBtn = document.getElementById("genBtn");
+const saveBtn = document.getElementById("saveBtn");
+const loading = document.getElementById("loading");
+
+/* DEFAULT DATE */
+
+dateEl.value = new Date().toISOString().slice(0,10);
+
+/* POZICE (bez VET INST) */
+
 const POSITIONS = [
 "DP-L","DP-P","ZRC-L","ZRC-P","T-L","T-P",
 "AGR-LP","AGR-PP","AGR-PZ","AGR-LZ",
 "MOT-L","MOT-P","LEP-LP","LEP-PP","LEP-Z",
 "REPRO-L","REPRO-P","VYP1-L","VYP1-P",
 "VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
-]; // ❌ bez VET INST
-
-date.value = new Date().toISOString().slice(0,10);
+];
 
 let phases=[];
-let reserves=[];
+let reserveWorkers=[];
 
-/* ===== TIME HEADERS ===== */
+/* TIME LABELS */
 
-function getPhaseLabels(){
- const s = shift.value;
-
+function phaseLabels(){
+ const s = shiftEl.value;
  if(s==="ranni") return ["6–8","8–10","10–12","12–14"];
- if(s==="odpo")  return ["14–16","16–18","18–20","20–22"];
+ if(s==="odpo") return ["14–16","16–18","18–20","20–22"];
  return ["22–00","00–02","02–04","04–06"];
 }
 
-/* ===== BUILD PHASE1 ===== */
+/* BUILD PHASE1 */
 
 async function buildPhase1(){
 
  const snap = await getDocs(collection(db,"employees"));
- const workers=[];
 
+ const workers=[];
  snap.forEach(d=>{
   const e=d.data();
   if(e.statusToday==="work"){
-    workers.push({id:d.id,name:e.name+" "+e.surname,skills:e.skills||[]});
+    workers.push({
+      id:d.id,
+      name:e.name+" "+e.surname,
+      skills:e.skills||[]
+    });
   }
  });
 
- const used=new Set();
- const a={};
+ /* kandidáti pro každou pozici */
 
- for(const pos of POSITIONS){
-   const cand = workers
-     .filter(w=>w.skills.includes(pos)&&!used.has(w.id))
+ const candidatesMap = {};
+
+ POSITIONS.forEach(pos=>{
+   candidatesMap[pos] = workers.filter(w=>w.skills.includes(pos));
+ });
+
+ /* seřadit pozice od nejtěžších */
+
+ const orderedPositions = [...POSITIONS]
+   .sort((a,b)=>
+     candidatesMap[a].length - candidatesMap[b].length
+   );
+
+ const used = new Set();
+ const assign = {};
+
+ for(const pos of orderedPositions){
+
+   const cand = candidatesMap[pos]
+     .filter(w=>!used.has(w.id))
      .sort(()=>Math.random()-.5)[0];
 
-   if(cand){a[pos]=cand;used.add(cand.id);}
-   else a[pos]=null;
+   if(cand){
+     assign[pos] = cand;
+     used.add(cand.id);
+   } else {
+     assign[pos] = null;
+   }
  }
 
- reserves = workers.filter(w=>!used.has(w.id));
- return a;
+ reserveWorkers = workers.filter(w=>!used.has(w.id));
+
+ return assign;
 }
 
-/* ===== ROTATE ===== */
+/* ROTACE */
 
 function rotate(prev){
 
@@ -211,9 +241,12 @@ function rotate(prev){
  return a;
 }
 
-/* ===== GENERATE ===== */
+/* GENERATE */
 
-window.generate = async ()=>{
+genBtn.onclick = async ()=>{
+
+ loading.style.display="flex";
+ genBtn.disabled = true;
 
  const p1 = await buildPhase1();
  const p2 = rotate(p1);
@@ -222,55 +255,59 @@ window.generate = async ()=>{
 
  phases=[p1,p2,p3,p4];
  render();
+
+ loading.style.display="none";
+ genBtn.disabled = false;
 };
 
-/* ===== RENDER GRID ===== */
+/* RENDER */
 
 function render(){
 
- const labels = getPhaseLabels();
+ const labels = phaseLabels();
 
  let html = "<tr><th>Pozice</th>";
  labels.forEach(l=> html+=`<th>${l}</th>`);
  html+="</tr>";
 
  for(const pos of POSITIONS){
-
    html+=`<tr><td class="posCol">${pos}</td>`;
-
    phases.forEach(ph=>{
-     const w = ph[pos];
-     html+=`<td>${w ? w.name : "—"}</td>`;
+     html+=`<td>${ph[pos] ? ph[pos].name : "—"}</td>`;
    });
-
    html+="</tr>";
  }
 
- grid.innerHTML = html;
+ gridEl.innerHTML = html;
 
- reserves.innerHTML =
-  reserves.length
-   ? reserves.map(r=>r.name).join("<br>")
+ reservesEl.innerHTML =
+  reserveWorkers.length
+   ? reserveWorkers.map(r=>r.name).join("<br>")
    : "Nikdo";
 }
 
-/* ===== SAVE ===== */
+/* SAVE */
 
-window.saveShift = async ()=>{
+saveBtn.onclick = async ()=>{
 
- if(!phases.length){ alert("Nejdřív generuj"); return; }
+ if(!phases.length){
+   alert("Nejdřív generuj");
+   return;
+ }
 
  const out = phases.map(ph=>{
    const o={};
-   Object.entries(ph).forEach(([k,w])=>{ if(w) o[k]=w.id; });
+   Object.entries(ph).forEach(([k,w])=>{
+     if(w) o[k]=w.id;
+   });
    return o;
  });
 
- await setDoc(doc(db,"shifts",date.value+"_"+shift.value),{
-  date:date.value,
-  shift:shift.value,
+ await setDoc(doc(db,"shifts",dateEl.value+"_"+shiftEl.value),{
+  date:dateEl.value,
+  shift:shiftEl.value,
   phases:out,
-  reserves:reserves.map(r=>r.id),
+  reserves:reserveWorkers.map(r=>r.id),
   createdAt:Date.now()
  });
 
@@ -278,6 +315,5 @@ window.saveShift = async ()=>{
 };
 
 </script>
-
 </body>
 </html>
