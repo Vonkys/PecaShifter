@@ -328,28 +328,46 @@ async function loadWorkers(){
 
 function buildPhase(act){
 
- const used=new Set();
- const assign={};
+ const MAX_TRIES = 200;
 
- const ordered=[...act].sort((a,b)=>
-  workers.filter(w=>w.skills.includes(a)).length -
-  workers.filter(w=>w.skills.includes(b)).length
- );
+ for(let attempt=0; attempt<MAX_TRIES; attempt++){
 
- ordered.forEach(pos=>{
-  const pool = workers
-   .filter(w=>w.skills.includes(pos)&&!used.has(w.id))
-   .sort(()=>Math.random()-.5);
+   const used = new Set();
+   const assign = {};
+   let ok = true;
 
-  if(pool.length){
-   assign[pos]=pool[0];
-   used.add(pool[0].id);
-  } else assign[pos]=null;
- });
+   // seřadit od nejtěžších pozic
+   const ordered=[...act].sort((a,b)=>
+     workers.filter(w=>w.skills.includes(a)).length -
+     workers.filter(w=>w.skills.includes(b)).length
+   );
 
- const reserves = workers.filter(w=>!used.has(w.id));
- return {assign,reserves};
+   for(const pos of ordered){
+
+     const pool = workers
+       .filter(w=>w.skills.includes(pos) && !used.has(w.id));
+
+     if(!pool.length){
+       ok = false;
+       break;
+     }
+
+     const pick = pool[Math.floor(Math.random()*pool.length)];
+     assign[pos] = pick;
+     used.add(pick.id);
+   }
+
+   if(ok){
+     const reserves = workers.filter(w=>!used.has(w.id));
+     return {assign,reserves};
+   }
+
+ }
+
+ // když se nepovedlo složit
+ return null;
 }
+
 
 /* GENERATE */
 
@@ -361,10 +379,19 @@ genBtn.onclick = async ()=>{
  const act=activePositions();
 
  for(let i=0;i<4;i++){
-  const {assign,reserves}=buildPhase(act);
-  phases.push(assign);
-  phaseReserves.push(reserves);
+
+ const result = buildPhase(act);
+
+ if(!result){
+   loadingEl.style.display="none";
+   alert("❌ Nelze obsadit všechny pozice — málo lidí nebo skills");
+   return;
  }
+
+ phases.push(result.assign);
+ phaseReserves.push(result.reserves);
+}
+
 
  render();
  loadingEl.style.display="none";
