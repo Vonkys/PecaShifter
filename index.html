@@ -39,6 +39,13 @@ body{
   box-shadow:0 10px 25px rgba(0,0,0,.35);
 }
 
+#loading{
+  text-align:center;
+  opacity:.8;
+}
+
+/* switch */
+
 .switch{
   display:flex;
   background:#1f2937;
@@ -57,9 +64,7 @@ body{
   transition:.15s;
 }
 
-.switch button:hover{
-  background:#4b5563;
-}
+.switch button:hover{ background:#4b5563; }
 
 .activeTab{
   background:#22c55e !important;
@@ -70,6 +75,8 @@ body{
   transform:scale(.96);
 }
 
+/* inputs */
+
 input{
   width:100%;
   padding:14px;
@@ -78,6 +85,8 @@ input{
   margin-bottom:10px;
   font-size:16px;
 }
+
+/* main button */
 
 .mainBtn{
   width:100%;
@@ -97,6 +106,8 @@ input{
   filter:brightness(.85);
 }
 
+/* menu buttons */
+
 .menu button{
   width:100%;
   padding:16px;
@@ -114,18 +125,10 @@ input{
 .btnStats{ background:#06b6d4; }
 .logout{ background:#374151; }
 
-.menu button:hover{
-  filter:brightness(1.1);
-}
-
+.menu button:hover{ filter:brightness(1.1); }
 .menu button:active{
   transform:scale(.97);
   filter:brightness(.85);
-}
-
-
-.logout{
-  background:#374151 !important;
 }
 
 .hidden{ display:none; }
@@ -146,7 +149,13 @@ input{
 <div class="logo">PecaShifter</div>
 <div class="sub">Směnový plánovací systém</div>
 
-<div id="authCard" class="card">
+<!-- LOADING GATE -->
+<div id="loading" class="card">
+  Ověřuji přihlášení…
+</div>
+
+<!-- AUTH -->
+<div id="authCard" class="card hidden">
 
   <div class="switch">
     <button id="tabLogin" class="activeTab" onclick="setMode('login')">Přihlášení</button>
@@ -162,43 +171,38 @@ input{
 
 </div>
 
+<!-- MENU -->
 <div id="menuCard" class="card hidden">
 
   <div class="roleTag" id="roleLabel"></div>
 
   <div class="menu">
 
-<button class="btnEmployees adminOnly"
-onclick="go('employees.html')">
-👥 Karty zaměstnance
-</button>
+    <button class="btnEmployees adminOnly" onclick="go('employees.html')">
+      👥 Karty zaměstnance
+    </button>
 
-<button class="btnGenerator adminOnly"
-onclick="go('generator.html')">
-⚙️ Generátor
-</button>
+    <button class="btnGenerator adminOnly" onclick="go('generator.html')">
+      ⚙️ Generátor
+    </button>
 
-<button class="btnSchedule"
-onclick="go('schedule.html')">
-📊 Směnový graf
-</button>
+    <button class="btnSchedule" onclick="go('schedule.html')">
+      📊 Směnový graf
+    </button>
 
-<button class="btnStats"
-onclick="go('stats.html')">
-📈 Statistiky
-</button>
+    <button class="btnStats" onclick="go('stats.html')">
+      📈 Statistiky
+    </button>
 
-<button class="logout"
-onclick="logout()">
-Odhlásit
-</button>
+    <button class="logout" onclick="logout()">
+      Odhlásit
+    </button>
+
+  </div>
 
 </div>
 
-
-
 </div>
-
 
 <script type="module">
 
@@ -218,7 +222,6 @@ import {
   setDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-
 const firebaseConfig = {
   apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
   authDomain: "shifter-ee3e6.firebaseapp.com",
@@ -232,6 +235,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+const loading = document.getElementById("loading");
+const emailEl = document.getElementById("email");
+const passEl = document.getElementById("pass");
+const authCard = document.getElementById("authCard");
+const menuCard = document.getElementById("menuCard");
+const roleLabel = document.getElementById("roleLabel");
+
 let mode = "login";
 
 window.setMode = (m)=>{
@@ -243,19 +253,15 @@ window.setMode = (m)=>{
 
 window.submitAuth = async ()=>{
 
-  const email = emailEl.value;
-  const pass = passEl.value;
-
   try{
 
     if(mode==="login"){
-      await signInWithEmailAndPassword(auth,email,pass);
+      await signInWithEmailAndPassword(auth,emailEl.value,passEl.value);
     }else{
-      const cred = await createUserWithEmailAndPassword(auth,email,pass);
+      const cred = await createUserWithEmailAndPassword(auth,emailEl.value,passEl.value);
       await setDoc(doc(db,"users",cred.user.uid),{role:"user"});
       alert("Registrace proběhla");
       setMode("login");
-      return;
     }
 
   }catch(e){
@@ -267,15 +273,12 @@ window.submitAuth = async ()=>{
     ){
       alert("Neplatné přihlášení — účet neexistuje nebo špatné heslo.");
     }
-
     else if(e.code==="auth/email-already-in-use"){
       alert("Tento email už je registrovaný.");
     }
-
     else if(e.code==="auth/weak-password"){
       alert("Heslo musí mít aspoň 6 znaků.");
     }
-
     else{
       alert("Chyba přihlášení.");
     }
@@ -285,14 +288,9 @@ window.submitAuth = async ()=>{
 window.logout = ()=> signOut(auth);
 window.go = (p)=> location.href=p;
 
-const emailEl = document.getElementById("email");
-const passEl = document.getElementById("pass");
-const authCard = document.getElementById("authCard");
-const menuCard = document.getElementById("menuCard");
-const roleLabel = document.getElementById("roleLabel");
-
-
 onAuthStateChanged(auth, async user=>{
+
+  loading.classList.add("hidden");
 
   if(!user){
     authCard.classList.remove("hidden");
