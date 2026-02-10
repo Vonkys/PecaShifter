@@ -113,6 +113,17 @@ details summary{
  font-size:13px;
 }
 
+.lockedRow{
+ background:rgba(220,38,38,0.18); /* červená průhledná */
+}
+
+.lockedRow td{
+ background:rgba(220,38,38,0.18);
+}
+
+.lockedRow:hover td{
+ background:rgba(220,38,38,0.28);
+}
 
 /* TABLE */
 
@@ -177,7 +188,6 @@ td.slot:hover{background:#1f2937;}
 <div class="container">
 
 <div class="card">
-
 <label>Datum</label>
 <input type="date" id="date">
 
@@ -195,7 +205,6 @@ td.slot:hover{background:#1f2937;}
 
 <button class="genBtn" id="genBtn">⚙️ Generovat</button>
 <button class="loadBtn" id="loadBtn">📂 Načíst uloženou směnu</button>
-
 </div>
 
 <div class="card">
@@ -244,13 +253,11 @@ const reservesBoxEl = document.getElementById("reservesBox");
 const genBtn = document.getElementById("genBtn");
 const loadBtn = document.getElementById("loadBtn");
 const saveBtn = document.getElementById("saveBtn");
-
 const lockBox = document.getElementById("lockBox");
 
 const pickModal = document.getElementById("pickModal");
 const pickTitle = document.getElementById("pickTitle");
 const pickList = document.getElementById("pickList");
-
 
 dateEl.value = new Date().toISOString().slice(0,10);
 
@@ -261,19 +268,23 @@ const POSITIONS = [
 "AGR-LP","AGR-PP","AGR-PZ","AGR-LZ",
 "MOT-L","MOT-P","LEP-LP","LEP-PP","LEP-Z",
 "REPRO-L","REPRO-P","VYP1-L","VYP1-P",
-"VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P"
+"VYP2-L","VYP2-P","PR-L","PR-P","ZAM-L","ZAM-P","VET","INST",
 ];
 
 POSITIONS.forEach(p=>{
  lockBox.innerHTML += `
-  <label class="lockRow">
-   <input type="checkbox" value="${p}">
-   <span class="lockCode">${p}</span>
-  </label>`;
+ <label class="lockRow">
+  <input type="checkbox" value="${p}">
+  <span>${p}</span>
+ </label>`;
 });
 
+function lockedPositions(){
+ return [...lockBox.querySelectorAll("input:checked")].map(x=>x.value);
+}
+
 function activePositions(){
- const locked=[...lockBox.querySelectorAll("input:checked")].map(x=>x.value);
+ const locked = lockedPositions();
  return POSITIONS.filter(p=>!locked.includes(p));
 }
 
@@ -284,7 +295,7 @@ let phases=[];
 let phaseReserves=[];
 let lastPosByWorker={};
 
-/* LOAD WORKERS */
+/* WORKERS */
 
 async function loadWorkers(){
  const snap = await getDocs(collection(db,"employees"));
@@ -297,7 +308,7 @@ async function loadWorkers(){
  });
 }
 
-/* BUILD PHASE */
+/* BUILD */
 
 function buildPhase(act){
 
@@ -310,22 +321,14 @@ function buildPhase(act){
  );
 
  ordered.forEach(pos=>{
-
   const pool = workers
    .filter(w=>w.skills.includes(pos)&&!used.has(w.id))
-   .map(w=>{
-    const weight=1/(w.skills.length||1);
-    const pen= lastPosByWorker[w.id]===pos?0.3:1;
-    return {w,score:weight*pen+Math.random()*0.2};
-   })
-   .sort((a,b)=>b.score-a.score);
+   .sort(()=>Math.random()-.5);
 
   if(pool.length){
-   assign[pos]=pool[0].w;
-   used.add(pool[0].w.id);
-   lastPosByWorker[pool[0].w.id]=pos;
+   assign[pos]=pool[0];
+   used.add(pool[0].id);
   } else assign[pos]=null;
-
  });
 
  const reserves = workers.filter(w=>!used.has(w.id));
@@ -337,18 +340,21 @@ function buildPhase(act){
 genBtn.onclick = async ()=>{
  loadingEl.style.display="flex";
  await loadWorkers();
- phases=[]; phaseReserves=[]; lastPosByWorker={};
+
+ phases=[]; phaseReserves=[];
  const act=activePositions();
+
  for(let i=0;i<4;i++){
   const {assign,reserves}=buildPhase(act);
   phases.push(assign);
   phaseReserves.push(reserves);
  }
- render(act);
+
+ render();
  loadingEl.style.display="none";
 };
 
-/* LOAD FROM FIREBASE */
+/* LOAD */
 
 loadBtn.onclick = async ()=>{
 
@@ -370,17 +376,17 @@ loadBtn.onclick = async ()=>{
  phases = data.phases.map(ph=>{
   const o={};
   Object.entries(ph).forEach(([pos,id])=>{
-    o[pos]=map[id]||null;
+   o[pos]=map[id]||null;
   });
   return o;
  });
 
  phaseReserves = phases.map(ph=>{
-  const usedIds=new Set(Object.values(ph).filter(Boolean).map(w=>w.id));
-  return workers.filter(w=>!usedIds.has(w.id));
+  const used=new Set(Object.values(ph).filter(Boolean).map(w=>w.id));
+  return workers.filter(w=>!used.has(w.id));
  });
 
- render(activePositions());
+ render();
  loadingEl.style.display="none";
 };
 
@@ -393,19 +399,28 @@ function phaseLabels(){
  return ["22:00-00:00","00:00-02:15","02:45-04:00","04:00-06:00"];
 }
 
-function render(act){
+function render(){
 
  const L=phaseLabels();
+ const locked = new Set(lockedPositions());
+
  let html="<tr><th>Pozice</th>";
  L.forEach(x=>html+=`<th>${x}</th>`);
  html+="</tr>";
 
- act.forEach(pos=>{
-  html+=`<tr><td class="posCol">${pos}</td>`;
+ POSITIONS.forEach(pos=>{
+  const isLocked = locked.has(pos);
+  html+=`<tr class="${isLocked?'lockedRow':''}">
+  <td class="posCol">
+   ${pos} ${isLocked?'🔒':''}
+   <button onclick="toggleLock('${pos}')">🔓</button>
+  </td>`;
+
   for(let p=0;p<4;p++){
-   const w=phases[p][pos];
+   const w=phases[p]?.[pos];
    html+=`<td class="slot" onclick="pick(${p},'${pos}')">${w?w.name:"—"}</td>`;
   }
+
   html+="</tr>";
  });
 
@@ -418,7 +433,15 @@ function render(act){
  }</div>`).join("");
 }
 
-/* PICK SWAP */
+/* LOCK TOGGLE */
+
+window.toggleLock=(pos)=>{
+ const cb=[...lockBox.querySelectorAll("input")].find(x=>x.value===pos);
+ if(cb) cb.checked=!cb.checked;
+ render();
+};
+
+/* PICK */
 
 let pickPhaseIndex,pickPosition;
 
@@ -439,16 +462,14 @@ window.swapWorker=(wid)=>{
  if(cur) phaseReserves[pickPhaseIndex].push(cur);
  phases[pickPhaseIndex][pickPosition]=w;
  phaseReserves[pickPhaseIndex]=phaseReserves[pickPhaseIndex].filter(x=>x.id!==wid);
- closePick();
- render(activePositions());
+ closePick(); render();
 };
 
 window.removeWorker=()=>{
  const cur=phases[pickPhaseIndex][pickPosition];
  if(cur) phaseReserves[pickPhaseIndex].push(cur);
  phases[pickPhaseIndex][pickPosition]=null;
- closePick();
- render(activePositions());
+ closePick(); render();
 };
 
 window.closePick=()=> pickModal.style.display="none";
