@@ -6,86 +6,69 @@
 <title>Statistiky</title>
 
 <style>
-
 body{
   margin:0;
-  font-family:system-ui, Arial;
-  background:linear-gradient(160deg,#0f172a,#1e293b);
+  font-family:system-ui;
+  background:#0f172a;
   color:white;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:100vh;
 }
 
-.wrap{
-  width:100%;
-  max-width:520px;
-  padding:20px;
+.topbar{
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 16px;
+  background:#020617;
+  border-bottom:1px solid #1f2937;
+}
+
+.menuBtn{
+  padding:8px 14px;
+  border-radius:10px;
+  border:none;
+  font-weight:800;
+  background:#334155;
+  color:white;
+  cursor:pointer;
+}
+
+.container{
+  padding:16px;
+  max-width:900px;
+  margin:auto;
 }
 
 .card{
   background:#111827;
-  border-radius:18px;
-  padding:28px;
-  box-shadow:0 10px 30px rgba(0,0,0,.4);
-  text-align:center;
-}
-
-h1{
-  margin:0 0 10px 0;
-  font-size:28px;
-}
-
-.sub{
-  opacity:.7;
-  margin-bottom:22px;
-}
-
-.big{
-  font-size:34px;
-  font-weight:900;
-  letter-spacing:2px;
-  color:#38bdf8;
-  margin:18px 0;
-}
-
-.desc{
-  opacity:.75;
-  font-size:14px;
-  line-height:1.5;
-}
-
-button{
-  margin-top:26px;
-  width:100%;
   padding:16px;
-  border:none;
   border-radius:14px;
+  margin-bottom:12px;
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  padding:6px 0;
+  border-bottom:1px solid #1f2937;
+}
+
+.absence{
+  color:#f87171;
   font-weight:800;
-  font-size:16px;
-  background:#334155;
-  color:white;
-  cursor:pointer;
-  transition:.15s;
 }
 
-button:hover{
-  filter:brightness(1.15);
+select{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:12px;
 }
 
-button:active{
-  transform:scale(.97);
-}
-
-.badge{
-  display:inline-block;
-  margin-top:14px;
-  padding:6px 12px;
-  border-radius:999px;
-  background:#1f2937;
-  font-size:12px;
-  opacity:.8;
+.loading{
+  text-align:center;
+  opacity:.7;
 }
 
 </style>
@@ -93,35 +76,125 @@ button:active{
 
 <body>
 
-<div class="wrap">
+<div class="topbar">
+  <div><b>📈 Statistiky</b></div>
+  <button class="menuBtn" onclick="location.href='index.html'">Menu</button>
+</div>
 
-  <div class="card">
+<div class="container">
 
-    <h1>📈 Statistiky směn</h1>
-    <div class="sub">Výkonnost • rotace • docházka</div>
+<select id="workerSelect"></select>
 
-    <div class="big">WILL BE SOON</div>
-
-    <div class="desc">
-      Připravujeme pokročilé statistiky:<br><br>
-      • kdo umí nejvíc pozic<br>
-      • kdo byl kde nejčastěji<br>
-      • absence / docházka<br>
-      • úzká místa linek<br>
-      • doporučení na doškolení
-    </div>
-
-    <div class="badge">
-      modul připravujeme
-    </div>
-
-    <button onclick="location.href='index.html'">
-      ⬅ Zpět na menu
-    </button>
-
-  </div>
+<div id="out" class="card loading">Načítám…</div>
 
 </div>
 
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs } 
+from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const app = initializeApp({
+ apiKey:"AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
+ authDomain:"shifter-ee3e6.firebaseapp.com",
+ projectId:"shifter-ee3e6"
+});
+
+const db = getFirestore(app);
+
+const sel = document.getElementById("workerSelect");
+const out = document.getElementById("out");
+
+let workersMap = {};
+let shifts = [];
+
+/* LOAD WORKERS */
+
+const wSnap = await getDocs(collection(db,"employees"));
+wSnap.forEach(d=>{
+  const e=d.data();
+  workersMap[d.id] = e.name+" "+e.surname;
+});
+
+sel.innerHTML = Object.entries(workersMap)
+  .map(([id,name])=>`<option value="${id}">${name}</option>`)
+  .join("");
+
+/* LOAD SHIFTS */
+
+const sSnap = await getDocs(collection(db,"shifts"));
+sSnap.forEach(d=>shifts.push(d.data()));
+
+sel.onchange = compute;
+compute();
+
+function compute(){
+
+ const wid = sel.value;
+
+ let phaseCount = 0;
+ let shiftCount = 0;
+ let reserveShiftCount = 0;
+ let absenceCount = 0;
+ const posCount = {};
+
+ shifts.forEach(s=>{
+
+   let workedThisShift = false;
+
+   (s.phases || []).forEach(ph=>{
+     Object.entries(ph).forEach(([pos,id])=>{
+       if(id === wid){
+         phaseCount++;
+         posCount[pos] = (posCount[pos]||0)+1;
+         workedThisShift = true;
+       }
+     });
+   });
+
+   if(workedThisShift){
+     shiftCount++;
+   }
+ });
+
+ /* RESERVE = byl work/shitmaking ale nebyl v žádné fázi */
+ 
+ // bereme z employees statusToday snapshot — hrubý model
+ 
+ // spočítáme směny kde nebyl nasazen → ale existuje směna
+ const totalShiftDocs = shifts.length;
+ if(totalShiftDocs > shiftCount){
+   reserveShiftCount = totalShiftDocs - shiftCount;
+ }
+
+ /* ABSENCE — z employees statusToday */
+ 
+ // jednoduché: pokud dnes není work/shitmaking → absence++
+ 
+ const emp = Object.entries(workersMap)
+   .find(([id])=>id===wid);
+
+ // absence model jen placeholder — rozšiřitelné
+ absenceCount = 0; // zatím bez historie stavů
+
+ const posRows = Object.entries(posCount)
+   .sort((a,b)=>b[1]-a[1])
+   .map(([p,c])=>`<div class="row"><div>${p}</div><div>${c}</div></div>`)
+   .join("");
+
+ out.innerHTML = `
+   <div class="row"><b>Odpracované směny</b><b>${shiftCount + reserveShiftCount}</b></div>
+   <div class="row"><div>Aktivní nasazení</div><div>${shiftCount}</div></div>
+   <div class="row"><div>Náhradník</div><div>${reserveShiftCount}</div></div>
+   <div class="row"><div>Fáze celkem</div><div>${phaseCount}</div></div>
+   <div class="row absence"><div>Absence</div><div>${absenceCount}</div></div>
+   <br>
+   <b>Pozice:</b>
+   ${posRows || "Žádná data"}
+ `;
+}
+
+</script>
 </body>
 </html>
