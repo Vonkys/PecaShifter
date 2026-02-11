@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -173,9 +174,20 @@ input{
 
 <!-- MENU -->
 <div id="menuCard" class="card hidden">
+<div class="roleTag" id="roleLabel"></div>
+<!-- HROMADNÁ ZPRÁVA -->
+<div id="broadcastCard" class="card hidden" style="
+  margin-bottom:14px;
+  background:#1e293b;
+  border:2px solid #0ea5e9;
+">
+  <div style="font-weight:900;margin-bottom:6px;">
+    📢 Hromadná zpráva
+  </div>
+  <div id="broadcastText" style="line-height:1.4;opacity:.95;"></div>
+</div>
 
-  <div class="roleTag" id="roleLabel"></div>
- <!-- MOJE POZNÁMKA -->
+<!-- MOJE POZNÁMKA -->
 <div id="myNoteCard" class="card hidden" style="margin-bottom:14px;">
   <div style="font-weight:800;margin-bottom:6px;">
     📝 Moje poznámka
@@ -255,6 +267,8 @@ const menuCard = document.getElementById("menuCard");
 const roleLabel = document.getElementById("roleLabel");
 const myNoteCard = document.getElementById("myNoteCard");
 const myNoteText = document.getElementById("myNoteText");
+const broadcastCard = document.getElementById("broadcastCard");
+const broadcastTextEl = document.getElementById("broadcastText");
 
 let mode = "login";
 
@@ -325,7 +339,7 @@ onAuthStateChanged(auth, async user=>{
   authCard.classList.add("hidden");
   menuCard.classList.remove("hidden");
  loadMyNote(user);
-
+ loadBroadcast();
 });
 async function loadMyNote(user){
 
@@ -348,6 +362,20 @@ async function loadMyNote(user){
     myNoteCard.classList.remove("hidden");
   }else{
     myNoteCard.classList.add("hidden");
+  }
+}
+
+async function loadBroadcast(){
+
+  const snap = await getDoc(doc(db,"config","global"));
+
+  const msg = snap.data()?.broadcastMessage;
+
+  if(msg && msg.trim() !== ""){
+    broadcastTextEl.innerText = msg;
+    broadcastCard.classList.remove("hidden");
+  }else{
+    broadcastCard.classList.add("hidden");
   }
 }
 
