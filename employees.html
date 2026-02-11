@@ -203,7 +203,8 @@ input, textarea{
 
     <input id="fName" placeholder="Jméno">
     <input id="lName" placeholder="Příjmení">
-    <textarea id="info" placeholder="Informace"></textarea>
+    <input id="email" placeholder="Email zaměstnance">
+    <textarea id="info" placeholder="Poznámka"></textarea>
 
     <h4>Pozice</h4>
     <div id="skillsBox" class="skills"></div>
@@ -266,6 +267,7 @@ const list = document.getElementById("list");
 
 const fNameEl = document.getElementById("fName");
 const lNameEl = document.getElementById("lName");
+const emailEl = document.getElementById("email");
 const infoEl = document.getElementById("info");
 const statusEl = document.getElementById("status");
 
@@ -308,6 +310,7 @@ window.openNew=()=>{
   editId=null;
   fNameEl.value="";
   lNameEl.value="";
+  emailEl.value="";
   infoEl.value="";
   statusEl.value="work";
   skillsBox.querySelectorAll("input").forEach(c=>{
@@ -337,12 +340,14 @@ window.saveEmp = async ()=>{
     .toLowerCase().replace(/\s+/g,"_");
 
   await setDoc(doc(db,"employees",id),{
-    name:fNameEl.value,
-    surname:lNameEl.value,
-    info:infoEl.value,
-    skills,
-    statusToday:statusEl.value
-  });
+  name:fNameEl.value,
+  surname:lNameEl.value,
+  email:emailEl.value.toLowerCase().trim(),
+  info:infoEl.value,
+  skills,
+  statusToday:statusEl.value
+});
+
 
   alert("Uloženo");
   modal.style.display="none";
@@ -421,6 +426,7 @@ async function edit(id){
  modal.style.display="block";
  fNameEl.value=e.name;
  lNameEl.value=e.surname;
+ emailEl.value = e.email || "";
  infoEl.value=e.info;
  statusEl.value=e.statusToday||"work";
  skillsBox.querySelectorAll("input").forEach(c=>{
