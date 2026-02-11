@@ -60,8 +60,8 @@ input{
 <input id="filter" placeholder="🔎 Filtr podle jména…">
 
 <div class="card"><h3>🚨 Největší absence</h3><div id="rankAbs"></div></div>
-<div class="card"><h3>🔥 Nejvíc vytížení</h3><div id="rankActive"></div></div>
-<div class="card"><h3>⚠️ Úzká místa</h3><div id="rankPos"></div></div>
+<div class="card"><h3>🔥 Nejméně vytížení</h3><div id="rankActive"></div></div>
+
 
 <div id="cards"><div class="loading">Počítám data…</div></div>
 
@@ -83,7 +83,7 @@ const cardsEl = document.getElementById("cards");
 const filterEl = document.getElementById("filter");
 const rankAbsEl = document.getElementById("rankAbs");
 const rankActiveEl = document.getElementById("rankActive");
-const rankPosEl = document.getElementById("rankPos");
+
 
 /* LOAD */
 
@@ -153,29 +153,40 @@ function top3(arr){
 
 rankAbsEl.innerHTML="";
 rankActiveEl.innerHTML="";
-rankPosEl.innerHTML="";
 
-top3(Object.entries(stats).map(([id,s])=>({
- name:empNames[id],
- val:s.absence
-}))).forEach(x=>{
- rankAbsEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
+top3(
+ Object.entries(stats)
+  .filter(([id,s])=>s.absence>0)
+  .map(([id,s])=>({
+    name:empNames[id],
+    val:s.absence
+  }))
+).forEach(x=>{
+ rankAbsEl.innerHTML +=
+   `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
 });
 
-top3(Object.entries(stats).map(([id,s])=>({
- name:empNames[id],
- val:s.active
-}))).forEach(x=>{
- rankActiveEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
+
+/* 🧊 NEJMÍŇ VYTÍŽENÍ — jen kdo je v práci */
+
+const leastActive = Object.entries(stats)
+  .filter(([id])=>{
+    const st = empStatus[id];
+    return st==="work" || st==="shitmaking";
+  })
+  .map(([id,s])=>({
+    name: empNames[id],
+    val: s.active
+  }))
+  .sort((a,b)=>a.val-b.val)
+  .slice(0,3);
+
+leastActive.forEach(x=>{
+  rankActiveEl.innerHTML +=
+    `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
 });
 
-Object.entries(posCount)
- .map(([p,v])=>({name:p,val:v}))
- .sort((a,b)=>a.val-b.val)
- .slice(0,3)
- .forEach(x=>{
-   rankPosEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
- });
+
 
 /* ===== KARTY ===== */
 
