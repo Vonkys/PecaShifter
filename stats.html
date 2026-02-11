@@ -7,92 +7,153 @@
 
 <style>
 body{
-  margin:0;
-  font-family:system-ui;
-  background:#0f172a;
-  color:white;
+ margin:0;
+ font-family:system-ui;
+ background:#0f172a;
+ color:white;
 }
 
 .topbar{
-  height:56px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 16px;
-  background:#020617;
-  border-bottom:1px solid #1f2937;
+ height:56px;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ padding:0 16px;
+ background:#020617;
+ border-bottom:1px solid #1f2937;
 }
 
 .menuBtn{
-  padding:8px 14px;
-  border-radius:10px;
-  border:none;
-  font-weight:800;
-  background:#334155;
-  color:white;
-  cursor:pointer;
+ padding:8px 14px;
+ border-radius:10px;
+ border:none;
+ font-weight:800;
+ background:#334155;
+ color:white;
+ cursor:pointer;
 }
 
 .container{
-  padding:16px;
-  max-width:900px;
-  margin:auto;
+ max-width:1000px;
+ margin:auto;
+ padding:16px;
 }
 
 .card{
-  background:#111827;
-  padding:16px;
-  border-radius:14px;
-  margin-bottom:12px;
+ background:#111827;
+ border-radius:16px;
+ padding:16px;
+ margin-bottom:14px;
+}
+
+h3{
+ margin:0 0 10px 0;
+}
+
+input{
+ width:100%;
+ padding:12px;
+ border-radius:10px;
+ border:none;
+ margin-bottom:14px;
+ font-weight:700;
+}
+
+.worker{
+ font-weight:900;
+ font-size:18px;
+ margin-bottom:10px;
 }
 
 .row{
-  display:flex;
-  justify-content:space-between;
-  padding:6px 0;
-  border-bottom:1px solid #1f2937;
+ display:flex;
+ justify-content:space-between;
+ margin:6px 0;
+ font-weight:700;
 }
 
-.absence{
-  color:#f87171;
-  font-weight:800;
+.badge{
+ padding:4px 10px;
+ border-radius:999px;
+ font-size:12px;
+ font-weight:900;
 }
 
-select{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:none;
-  margin-bottom:12px;
+.active{ background:#16a34a; }
+.reserve{ background:#2563eb; }
+.absence{ background:#dc2626; }
+
+.barWrap{
+ background:#020617;
+ border-radius:10px;
+ overflow:hidden;
+ height:14px;
+ margin-top:6px;
+}
+
+.bar{
+ height:100%;
+ background:linear-gradient(90deg,#22c55e,#4ade80);
+}
+
+.rankRow{
+ display:flex;
+ justify-content:space-between;
+ padding:6px 0;
+ font-weight:800;
+ border-bottom:1px solid #1f2937;
+ font-size:14px;
+}
+
+.posItem{
+ font-size:13px;
+ opacity:.9;
 }
 
 .loading{
-  text-align:center;
-  opacity:.7;
+ text-align:center;
+ opacity:.7;
+ font-weight:900;
 }
-
 </style>
 </head>
 
 <body>
 
 <div class="topbar">
-  <div><b>📈 Statistiky</b></div>
-  <button class="menuBtn" onclick="location.href='index.html'">Menu</button>
+ <div><b>📊 Statistiky</b></div>
+ <button class="menuBtn" onclick="location.href='index.html'">Menu</button>
 </div>
 
 <div class="container">
 
-<select id="workerSelect"></select>
+<input id="filter" placeholder="🔎 Filtr podle jména…">
 
-<div id="out" class="card loading">Načítám…</div>
+<div class="card">
+<h3>🚨 Největší absence</h3>
+<div id="rankAbs"></div>
+</div>
+
+<div class="card">
+<h3>🔥 Nejvíc vytížení</h3>
+<div id="rankActive"></div>
+</div>
+
+<div class="card">
+<h3>⚠️ Úzká místa (nejmíň lidí)</h3>
+<div id="rankPos"></div>
+</div>
+
+<div id="cards">
+<div class="loading">Počítám data…</div>
+</div>
 
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs } 
+import { getFirestore, collection, getDocs }
 from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const app = initializeApp({
@@ -103,97 +164,137 @@ const app = initializeApp({
 
 const db = getFirestore(app);
 
-const sel = document.getElementById("workerSelect");
-const out = document.getElementById("out");
+const cardsEl = document.getElementById("cards");
+const filterEl = document.getElementById("filter");
+const rankAbsEl = document.getElementById("rankAbs");
+const rankActiveEl = document.getElementById("rankActive");
+const rankPosEl = document.getElementById("rankPos");
 
-let workersMap = {};
-let shifts = [];
+/* LOAD */
 
-/* LOAD WORKERS */
+const empSnap = await getDocs(collection(db,"employees"));
+const shiftSnap = await getDocs(collection(db,"shifts"));
 
-const wSnap = await getDocs(collection(db,"employees"));
-wSnap.forEach(d=>{
-  const e=d.data();
-  workersMap[d.id] = e.name+" "+e.surname;
+const empStatus = {};
+const empNames = {};
+
+empSnap.forEach(d=>{
+ const e=d.data();
+ empStatus[d.id]=e.statusToday || "work";
+ empNames[d.id]=e.name+" "+e.surname;
 });
 
-sel.innerHTML = Object.entries(workersMap)
-  .map(([id,name])=>`<option value="${id}">${name}</option>`)
-  .join("");
+/* STATS */
 
-/* LOAD SHIFTS */
+const stats = {};
+const posCount = {};
 
-const sSnap = await getDocs(collection(db,"shifts"));
-sSnap.forEach(d=>shifts.push(d.data()));
+empSnap.forEach(d=>{
+ stats[d.id]={active:0,reserve:0,absence:0,pos:{}};
+});
 
-sel.onchange = compute;
-compute();
+shiftSnap.forEach(s=>{
 
-function compute(){
+ const shift=s.data();
 
- const wid = sel.value;
+ Object.values(stats).forEach(x=>x._used=false);
 
- let phaseCount = 0;
- let shiftCount = 0;
- let reserveShiftCount = 0;
- let absenceCount = 0;
- const posCount = {};
+ shift.phases.forEach(ph=>{
+  Object.entries(ph).forEach(([pos,wid])=>{
+    if(!stats[wid]) return;
 
- shifts.forEach(s=>{
+    stats[wid].active++;
+    stats[wid]._used=true;
 
-   let workedThisShift = false;
-
-   (s.phases || []).forEach(ph=>{
-     Object.entries(ph).forEach(([pos,id])=>{
-       if(id === wid){
-         phaseCount++;
-         posCount[pos] = (posCount[pos]||0)+1;
-         workedThisShift = true;
-       }
-     });
-   });
-
-   if(workedThisShift){
-     shiftCount++;
-   }
+    stats[wid].pos[pos]=(stats[wid].pos[pos]||0)+1;
+    posCount[pos]=(posCount[pos]||0)+1;
+  });
  });
 
- /* RESERVE = byl work/shitmaking ale nebyl v žádné fázi */
- 
- // bereme z employees statusToday snapshot — hrubý model
- 
- // spočítáme směny kde nebyl nasazen → ale existuje směna
- const totalShiftDocs = shifts.length;
- if(totalShiftDocs > shiftCount){
-   reserveShiftCount = totalShiftDocs - shiftCount;
- }
+ Object.keys(stats).forEach(id=>{
+  if(stats[id]._used) return;
 
- /* ABSENCE — z employees statusToday */
- 
- // jednoduché: pokud dnes není work/shitmaking → absence++
- 
- const emp = Object.entries(workersMap)
-   .find(([id])=>id===wid);
+  const st = empStatus[id];
 
- // absence model jen placeholder — rozšiřitelné
- absenceCount = 0; // zatím bez historie stavů
+  if(st==="sick"||st==="vacation"||st==="paragraf"){
+    stats[id].absence++;
+  } else {
+    stats[id].reserve++;
+  }
+ });
 
- const posRows = Object.entries(posCount)
-   .sort((a,b)=>b[1]-a[1])
-   .map(([p,c])=>`<div class="row"><div>${p}</div><div>${c}</div></div>`)
-   .join("");
+});
 
- out.innerHTML = `
-   <div class="row"><b>Odpracované směny</b><b>${shiftCount + reserveShiftCount}</b></div>
-   <div class="row"><div>Aktivní nasazení</div><div>${shiftCount}</div></div>
-   <div class="row"><div>Náhradník</div><div>${reserveShiftCount}</div></div>
-   <div class="row"><div>Fáze celkem</div><div>${phaseCount}</div></div>
-   <div class="row absence"><div>Absence</div><div>${absenceCount}</div></div>
-   <br>
-   <b>Pozice:</b>
-   ${posRows || "Žádná data"}
- `;
+/* RANKINGS */
+
+function top3(arr){
+ return arr.sort((a,b)=>b.val-a.val).slice(0,3);
 }
+
+top3(Object.entries(stats).map(([id,s])=>({
+ name:empNames[id],
+ val:s.absence
+}))).forEach(x=>{
+ rankAbsEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
+});
+
+top3(Object.entries(stats).map(([id,s])=>({
+ name:empNames[id],
+ val:s.active
+}))).forEach(x=>{
+ rankActiveEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
+});
+
+top3(Object.entries(posCount).map(([p,v])=>({
+ name:p,val:v
+})).sort((a,b)=>a.val-b.val)).forEach(x=>{
+ rankPosEl.innerHTML += `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
+});
+
+/* RENDER CARDS */
+
+function render(){
+
+ const f = filterEl.value.toLowerCase();
+ cardsEl.innerHTML="";
+
+ Object.entries(stats).forEach(([id,s])=>{
+
+  const name = empNames[id];
+  if(!name.toLowerCase().includes(f)) return;
+
+  const total = s.active+s.reserve+s.absence;
+  if(total===0) return;
+
+  const pct = Math.round((s.active/total)*100);
+
+  const topPos = Object.entries(s.pos)
+   .sort((a,b)=>b[1]-a[1])
+   .slice(0,3);
+
+  const div=document.createElement("div");
+  div.className="card";
+
+  div.innerHTML=`
+   <div class="worker">${name}</div>
+
+   <div class="row">Aktivní<span class="badge active">${s.active}</span></div>
+   <div class="row">Náhradník<span class="badge reserve">${s.reserve}</span></div>
+   <div class="row">Absence<span class="badge absence">${s.absence}</span></div>
+
+   <div class="barWrap"><div class="bar" style="width:${pct}%"></div></div>
+
+   ${topPos.map(p=>`<div class="posItem">${p[0]} — ${p[1]}×</div>`).join("")}
+  `;
+
+  cardsEl.appendChild(div);
+
+ });
+
+}
+
+filterEl.oninput = render;
+render();
 
 </script>
 </body>
