@@ -157,7 +157,7 @@ input{
 <!-- AUTH -->
 <div id="authCard" class="card hidden">
 
-  <div class="switch">
+ <div class="switch">
     <button id="tabLogin" class="activeTab" onclick="setMode('login')">Přihlášení</button>
     <button id="tabReg" onclick="setMode('register')">Registrace</button>
   </div>
@@ -175,6 +175,13 @@ input{
 <div id="menuCard" class="card hidden">
 
   <div class="roleTag" id="roleLabel"></div>
+ <!-- MOJE POZNÁMKA -->
+<div id="myNoteCard" class="card hidden" style="margin-bottom:14px;">
+  <div style="font-weight:800;margin-bottom:6px;">
+    📝 Moje poznámka
+  </div>
+  <div id="myNoteText" style="opacity:.9; line-height:1.4;"></div>
+</div>
 
   <div class="menu">
 
@@ -219,8 +226,13 @@ import {
   getFirestore,
   doc,
   getDoc,
-  setDoc
+  setDoc,
+  collection,
+  getDocs,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyAYJCwb7Gn73JJQ_iNqh1eweds8SJL6K2o",
@@ -241,6 +253,8 @@ const passEl = document.getElementById("pass");
 const authCard = document.getElementById("authCard");
 const menuCard = document.getElementById("menuCard");
 const roleLabel = document.getElementById("roleLabel");
+const myNoteCard = document.getElementById("myNoteCard");
+const myNoteText = document.getElementById("myNoteText");
 
 let mode = "login";
 
@@ -280,7 +294,7 @@ window.submitAuth = async ()=>{
       alert("Heslo musí mít aspoň 6 znaků.");
     }
     else{
-      alert("Registrace úspěšná");
+      alert("Registrace OK");
     }
   }
 };
@@ -310,8 +324,32 @@ onAuthStateChanged(auth, async user=>{
 
   authCard.classList.add("hidden");
   menuCard.classList.remove("hidden");
+ loadMyNote(user);
 
 });
+async function loadMyNote(user){
+
+  const q = query(
+    collection(db,"employees"),
+    where("email","==", user.email)
+  );
+
+  const snap = await getDocs(q);
+
+  if(snap.empty){
+    myNoteCard.classList.add("hidden");
+    return;
+  }
+
+  const emp = snap.docs[0].data();
+
+  if(emp.info && emp.info.trim() !== ""){
+    myNoteText.innerText = emp.info;
+    myNoteCard.classList.remove("hidden");
+  }else{
+    myNoteCard.classList.add("hidden");
+  }
+}
 
 </script>
 
