@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -310,75 +311,105 @@ let workers=[];
 let phases=[];
 let phaseReserves=[];
 let lastPosByWorker={};
+let posHistory = {};   // historie kdo byl kde přes fáze
 
 /* WORKERS */
 
+
 async function loadWorkers(){
+
  const snap = await getDocs(collection(db,"employees"));
  workers=[];
+
  snap.forEach(d=>{
   const e=d.data();
-  if(e.statusToday==="work"){
-    workers.push({id:d.id,name:e.name,skills:e.skills||[]});
+
+  if(e.statusToday==="work" || e.statusToday==="shitmaking"){
+    workers.push({
+      id:d.id,
+      name:e.name,
+      skills:e.skills||[],
+      status:e.statusToday
+    });
   }
  });
 }
 
+
 /* BUILD */
 
-function buildPhase(act){
+function buildPhase(act, prevAssign){
 
- const assign = {};
  const used = new Set();
+ const assign = {};
 
- // kolik lidí umí pozici
- const map = {};
- act.forEach(pos=>{
-   map[pos] = workers.filter(w=>w.skills.includes(pos));
- });
-
- // nejtěžší pozice první
- const orderedPos = [...act].sort(
-   (a,b)=> map[a].length - map[b].length
+ // obtížnost pozic = kolik lidí to umí
+ const ordered = [...act].sort((a,b)=>
+   workers.filter(w=>w.skills.includes(a)).length -
+   workers.filter(w=>w.skills.includes(b)).length
  );
 
- for(const pos of orderedPos){
+ for(const pos of ordered){
 
-   const pool = map[pos].filter(w=>!used.has(w.id));
+   let pool = workers.filter(w =>
+     w.skills.includes(pos) &&
+     !used.has(w.id)
+   );
 
-   if(!pool.length){
+   if(pool.length === 0){
+     console.warn("❌ Neobsaditelná pozice:", pos);
      return null;
    }
 
    const scored = pool.map(w=>{
 
-     // méně skillů = větší priorita
-     const specScore = 1 / (w.skills.length || 1);
+     let score = Math.random()*2; // víc chaosu = víc míchání
 
-     // penalizace pokud byl na stejné pozici minule
-     const rotatePenalty =
-       lastPosByWorker[w.id] === pos ? 0.25 : 1;
+     // status priorita
+     if(w.status === "work") score += 4;
+     if(w.status === "shitmaking") score -= 2;
 
-     const score =
-       specScore * rotatePenalty +
-       Math.random()*0.05;
+     // nebyl minule na stejné pozici
+     if(prevAssign && prevAssign[pos]?.id === w.id)
+       score -= 8;
+
+     // nebyl vůbec v minulé fázi
+     if(prevAssign){
+       const wasUsed = Object.values(prevAssign)
+         .some(p=>p?.id === w.id);
+       if(!wasUsed) score += 2;
+     }
+
+     // historie pozice
+     if(posHistory[pos]){
+       const count = posHistory[pos]
+         .filter(id=>id===w.id).length;
+       score -= count * 2.5;
+     }
+
+     // univerzálové spíš do rezervy
+     score += 1/(w.skills.length || 1);
 
      return {w,score};
+
    });
 
+   // TOP 3 náhodně → víc promíchání
    scored.sort((a,b)=>b.score-a.score);
+   const top = scored.slice(0, Math.min(3, scored.length));
+   const chosen = top[Math.floor(Math.random()*top.length)].w;
 
-   const pick = scored[0].w;
+   assign[pos] = chosen;
+   used.add(chosen.id);
 
-   assign[pos] = pick;
-   used.add(pick.id);
-   lastPosByWorker[pick.id] = pos;
+   if(!posHistory[pos]) posHistory[pos]=[];
+   posHistory[pos].push(chosen.id);
  }
 
  const reserves = workers.filter(w=>!used.has(w.id));
+
  return {assign,reserves};
 }
-
 
 /* GENERATE */
 
@@ -388,18 +419,31 @@ genBtn.onclick = async ()=>{
 
  await loadWorkers();
 
- const act = activePositions();   // ← TOHLE CHYBÍ
+ const act = activePositions();
 
  phases = [];
  phaseReserves = [];
- lastPosByWorker = {};
+ posHistory = {};
 
- for(let i=0;i<4;i++){
+ // fáze 1
+ let res = buildPhase(act, null);
 
-   const res = buildPhase(act);
+ if(!res){
+   alert("❌ Nelze obsadit — chybí skill");
+   loadingEl.style.display="none";
+   return;
+ }
+
+ phases.push(res.assign);
+ phaseReserves.push(res.reserves);
+
+ // fáze 2–4 rotace
+ for(let i=1;i<4;i++){
+
+   res = buildPhase(act, phases[i-1]);
 
    if(!res){
-     alert("❌ Nelze obsadit všechny pozice — málo lidí / skillů");
+     alert("❌ Nelze obsadit — chybí skill");
      loadingEl.style.display="none";
      return;
    }
@@ -409,7 +453,6 @@ genBtn.onclick = async ()=>{
  }
 
  render();
-
  loadingEl.style.display="none";
 };
 
