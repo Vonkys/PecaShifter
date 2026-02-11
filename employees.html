@@ -195,6 +195,9 @@ input, textarea{
 
 <div class="container">
 <button class="addBtn" onclick="openNew()">+ Přidat zaměstnance</button>
+<button class="addBtn" style="background:#0ea5e9" onclick="openBroadcast()">
+📢 Hromadná zpráva všem
+</button>
 <div id="list"></div>
 </div>
 
@@ -224,7 +227,14 @@ input, textarea{
 
   </div>
 </div>
-
+</div>
+<div id="broadcastModal" class="modal">
+  <div class="modalBox">
+    <h3>📢 Hromadná zpráva</h3>
+    <textarea id="broadcastText" placeholder="Text pro všechny zaměstnance"></textarea>
+    <button class="save" onclick="saveBroadcast()">Uložit zprávu</button>
+    <button class="close" onclick="closeBroadcast()">Zavřít</button>
+  </div>
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -270,6 +280,8 @@ const lNameEl = document.getElementById("lName");
 const emailEl = document.getElementById("email");
 const infoEl = document.getElementById("info");
 const statusEl = document.getElementById("status");
+const broadcastModal = document.getElementById("broadcastModal");
+const broadcastTextEl = document.getElementById("broadcastText");
 
 /* pozice */
 
@@ -437,7 +449,25 @@ async function edit(id){
 
 load();
 
-</script>
+window.openBroadcast = async ()=>{
 
+ const snap = await getDoc(doc(db,"config","global"));
+ broadcastTextEl.value = snap.data()?.broadcastMessage || "";
+ broadcastModal.style.display = "block";
+};
+
+window.closeBroadcast = ()=> broadcastModal.style.display="none";
+
+window.saveBroadcast = async ()=>{
+
+ await setDoc(doc(db,"config","global"),{
+   broadcastMessage: broadcastTextEl.value
+ },{merge:true});
+
+ alert("Uloženo pro všechny");
+ broadcastModal.style.display="none";
+};
+
+</script>
 </body>
 </html>
