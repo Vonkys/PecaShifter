@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -310,74 +311,152 @@ let workers=[];
 let phases=[];
 let phaseReserves=[];
 let lastPosByWorker={};
+let posHistory = {};   // historie kdo byl kde přes fáze
 
 /* WORKERS */
 
+
 async function loadWorkers(){
+
  const snap = await getDocs(collection(db,"employees"));
  workers=[];
+
  snap.forEach(d=>{
   const e=d.data();
-  if(e.statusToday==="work"){
-    workers.push({id:d.id,name:e.name,skills:e.skills||[]});
+
+  if(e.statusToday==="work" || e.statusToday==="shitmaking"){
+    workers.push({
+      id:d.id,
+      name:e.name,
+      skills:e.skills||[],
+      status:e.statusToday
+    });
   }
  });
 }
 
+
 /* BUILD */
 
-function buildPhase(act){
+function buildPhase(act, prevAssign){
 
- const assign = {};
  const used = new Set();
+ const assign = {};
 
- // kolik lidí umí pozici
- const map = {};
- act.forEach(pos=>{
-   map[pos] = workers.filter(w=>w.skills.includes(pos));
+ const skillCount = {};
+ workers.forEach(w=>{
+   skillCount[w.id] = w.skills.length || 0;
  });
 
- // nejtěžší pozice první
- const orderedPos = [...act].sort(
-   (a,b)=> map[a].length - map[b].length
- );
+ /* ========= PASS 1 — LIDI S 1 SKILLEM NATVRDO ========= */
 
- for(const pos of orderedPos){
+ workers.forEach(w=>{
+   if(skillCount[w.id] !== 1) return;
 
-   const pool = map[pos].filter(w=>!used.has(w.id));
+   const onlyPos = w.skills[0];
+   if(!act.includes(onlyPos)) return;
+   if(assign[onlyPos]) return;
 
-   if(!pool.length){
+   assign[onlyPos] = w;
+   used.add(w.id);
+
+   if(!posHistory[onlyPos]) posHistory[onlyPos]=[];
+   posHistory[onlyPos].push(w.id);
+ });
+
+ /* ========= PASS 2 — ZBYTEK POZIC ========= */
+
+ const ordered = act
+   .filter(pos => !assign[pos])
+   .sort((a,b)=>
+     workers.filter(w=>w.skills.includes(a)).length -
+     workers.filter(w=>w.skills.includes(b)).length
+   );
+
+ for(const pos of ordered){
+
+   const poolWork = workers.filter(w =>
+  w.skills.includes(pos) &&
+  !used.has(w.id) &&
+  w.status === "work"
+);
+
+const poolShit = workers.filter(w =>
+  w.skills.includes(pos) &&
+  !used.has(w.id) &&
+  w.status === "shitmaking"
+);
+
+let pool = poolWork.length > 0 ? poolWork : poolShit;
+
+
+   if(pool.length === 0){
+     console.warn("❌ Neobsaditelná pozice:", pos);
      return null;
    }
 
    const scored = pool.map(w=>{
 
-     // méně skillů = větší priorita
-     const specScore = 1 / (w.skills.length || 1);
+     let score = Math.random()*2;
 
-     // penalizace pokud byl na stejné pozici minule
-     const rotatePenalty =
-       lastPosByWorker[w.id] === pos ? 0.25 : 1;
+     /* PRIORITY PODLE SKILL COUNT */
 
-     const score =
-       specScore * rotatePenalty +
-       Math.random()*0.05;
+     if(skillCount[w.id] === 2) score += 6;
+     if(skillCount[w.id] >= 4) score -= 1;
+
+     /* STATUS */
+
+     if(w.status === "work") score += 4;
+     if(w.status === "shitmaking") score -= 2;
+
+     /* ANTI STEJNÁ POZICE */
+
+     if(prevAssign && prevAssign[pos]?.id === w.id)
+       score -= 10;
+
+     /* HISTORIE */
+
+     if(posHistory[pos]){
+       const count = posHistory[pos].filter(id=>id===w.id).length;
+       score -= count * 3;
+     }
+
+     /* ANTI STEJNÁ DVOJICE */
+
+     if(prevAssign){
+       const prevIds = Object.values(prevAssign)
+         .filter(Boolean)
+         .map(x=>x.id);
+
+       if(prevIds.includes(w.id))
+         score -= 1.5;
+     }
+
+     /* VÍCE SKILLŮ = VÍCE ROTACE */
+
+     score += skillCount[w.id] * 0.6;
 
      return {w,score};
+
    });
 
    scored.sort((a,b)=>b.score-a.score);
 
-   const pick = scored[0].w;
+   const top = scored.slice(0, Math.min(4, scored.length));
+   const chosen = top[Math.floor(Math.random()*top.length)].w;
 
-   assign[pos] = pick;
-   used.add(pick.id);
-   lastPosByWorker[pick.id] = pos;
+   assign[pos] = chosen;
+   used.add(chosen.id);
+
+   if(!posHistory[pos]) posHistory[pos]=[];
+   posHistory[pos].push(chosen.id);
  }
 
  const reserves = workers.filter(w=>!used.has(w.id));
+
  return {assign,reserves};
 }
+
 
 
 /* GENERATE */
@@ -388,18 +467,31 @@ genBtn.onclick = async ()=>{
 
  await loadWorkers();
 
- const act = activePositions();   // ← TOHLE CHYBÍ
+ const act = activePositions();
 
  phases = [];
  phaseReserves = [];
- lastPosByWorker = {};
+ posHistory = {};
 
- for(let i=0;i<4;i++){
+ // fáze 1
+ let res = buildPhase(act, null);
 
-   const res = buildPhase(act);
+ if(!res){
+   alert("❌ Nelze obsadit — chybí skill");
+   loadingEl.style.display="none";
+   return;
+ }
+
+ phases.push(res.assign);
+ phaseReserves.push(res.reserves);
+
+ // fáze 2–4 rotace
+ for(let i=1;i<4;i++){
+
+   res = buildPhase(act, phases[i-1]);
 
    if(!res){
-     alert("❌ Nelze obsadit všechny pozice — málo lidí / skillů");
+     alert("❌ Nelze obsadit — chybí skill");
      loadingEl.style.display="none";
      return;
    }
@@ -409,7 +501,6 @@ genBtn.onclick = async ()=>{
  }
 
  render();
-
  loadingEl.style.display="none";
 };
 
