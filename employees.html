@@ -375,13 +375,20 @@ window.saveEmp = async ()=>{
 /* DELETE */
 
 window.deleteEmp = async ()=>{
+
  if(!editId) return;
+
+ const ok = confirm("Opravdu chceš smazat záznam zaměstnance?");
+
+ if(!ok) return;
+
  await deleteDoc(doc(db,"employees",editId));
+
  alert("Smazáno");
  modal.style.display="none";
  load();
 };
-/* tady */
+
 function paintStatusSelect(sel){
 
   sel.classList.remove(
