@@ -134,6 +134,16 @@ input, textarea{
   color:white;
 }
 
+.status-borrowed{
+  background:#a855f7;
+  color:white;
+}
+
+.status-loaned{
+  background:#14b8a6;
+  color:black;
+}
+
 
 .topbar{
   height:56px;
@@ -214,12 +224,15 @@ input, textarea{
 
     <h4>Stav dnes</h4>
     <select id="status">
-      <option value="work">V práci</option>
-      <option value="vacation">Dovolená</option>
-      <option value="paragraf">Paragraf</option>
-      <option value="sick">Nemoc</option>
-      <option value="shitmaking">Shit making</option>
-    </select>
+  <option value="work">V práci</option>
+  <option value="vacation">Dovolená</option>
+  <option value="paragraf">Paragraf</option>
+  <option value="sick">Nemoc</option>
+  <option value="shitmaking">Shit making</option>
+  <option value="borrowed">Půjčený</option>
+  <option value="loaned">Propůjčený</option>
+</select>
+
 
     <button class="save" onclick="saveEmp()">Uložit</button>
     <button class="delete" onclick="deleteEmp()">Smazat</button>
@@ -391,13 +404,16 @@ window.deleteEmp = async ()=>{
 
 function paintStatusSelect(sel){
 
-  sel.classList.remove(
+ sel.classList.remove(
   "status-work",
   "status-vacation",
   "status-sick",
   "status-paragraf",
-  "status-shitmaking"
-);
+  "status-shitmaking",
+  "status-borrowed",
+  "status-loaned"
+ );
+
 
   sel.classList.add("status-" + sel.value);
 }
@@ -415,13 +431,15 @@ async function load(){
   row.innerHTML=`
    <div class="empName">${e.name} ${e.surname}</div>
    <select>
-     <option value="work">Práce</option>
-     <option value="vacation">Dovolená</option>
-     <option value="paragraf">Paragraf</option>
-     <option value="sick">Nemoc</option>
-     <option value="shitmaking">Shit making</option>
-   </select>
-  `;
+  <option value="work">Práce</option>
+  <option value="vacation">Dovolená</option>
+  <option value="paragraf">Paragraf</option>
+  <option value="sick">Nemoc</option>
+  <option value="shitmaking">Shit making</option>
+  <option value="borrowed">Půjčený</option>
+  <option value="loaned">Propůjčený</option>
+</select>
+`;
 
   row.querySelector(".empName").onclick=()=>edit(d.id);
   const sel=row.querySelector("select");
