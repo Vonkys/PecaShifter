@@ -112,13 +112,26 @@ shiftSnap.forEach(docSnap=>{
 
  const shift = docSnap.data();
 
+ // 🔷 nejdřív loaned — celá směna = 4 fáze
+ Object.entries(empStatus).forEach(([id,st])=>{
+   if(st === "loaned"){
+     stats[id].active += 4;
+   }
+ });
+
  shift.phases.forEach(phase=>{
 
    const used = new Set(Object.values(phase));
 
-   // aktivní obsazení
+   // ===== aktivní obsazení =====
    Object.entries(phase).forEach(([pos,id])=>{
+
      if(!stats[id]) return;
+
+     const st = empStatus[id];
+
+     // borrowed jen když je work
+     if(st === "borrowed") return;
 
      stats[id].active++;
 
@@ -128,22 +141,32 @@ shiftSnap.forEach(docSnap=>{
      posCount[pos]=(posCount[pos]||0)+1;
    });
 
-   // zbytek lidí v téhle fázi
+   // ===== zbytek lidí =====
    Object.keys(stats).forEach(id=>{
+
      if(used.has(id)) return;
 
      const st = empStatus[id];
 
+     // ❌ borrowed mimo práci = nic
+     if(st === "borrowed") return;
+
+     // ❌ loaned už započítán celou směnou
+     if(st === "loaned") return;
+
      if(st==="sick"||st==="vacation"||st==="paragraf"){
        stats[id].absence++;
-     } else {
+     }
+     else if(st==="work" || st==="shitmaking"){
        stats[id].reserve++;
      }
+
    });
 
  });
 
 });
+
 
 /* ===== RANKINGS ===== */
 
@@ -172,7 +195,7 @@ top3(
 const leastActive = Object.entries(stats)
   .filter(([id])=>{
     const st = empStatus[id];
-    return st==="work" || st==="shitmaking";
+    return st==="work" || st==="shitmaking" || st==="borrowed" || st==="loaned";
   })
   .map(([id,s])=>({
     name: empNames[id],
