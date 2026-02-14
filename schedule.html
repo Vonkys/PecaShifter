@@ -102,6 +102,13 @@ th{
   opacity:.4;
 }
 
+.infoRow{
+  display:flex;
+  justify-content:space-between;
+  font-weight:800;
+  margin:6px 0;
+}
+
 </style>
 </head>
 
@@ -133,9 +140,17 @@ th{
 
 </div>
 
+<div class="card" id="shiftInfoBox" style="display:none">
+  <h3>ℹ️ Informace o směně</h3>
+  <div id="infoSK"></div>
+  <div id="infoFA"></div>
+  <div id="infoZA"></div>
+</div>
+
 <div class="card">
 <table id="grid"></table>
 </div>
+
 
 </div>
 
@@ -161,6 +176,12 @@ const dateEl = document.getElementById("date");
 const shiftEl = document.getElementById("shift");
 const nameFilterEl = document.getElementById("nameFilter");
 const gridEl = document.getElementById("grid");
+
+const shiftInfoBox = document.getElementById("shiftInfoBox");
+const infoSK = document.getElementById("infoSK");
+const infoFA = document.getElementById("infoFA");
+const infoZA = document.getElementById("infoZA");
+
 
 dateEl.value = new Date().toISOString().slice(0,10);
 
@@ -213,8 +234,15 @@ async function loadShift(){
    return;
  }
 
- phasesData = snap.data().phases;
- render();
+ const data = snap.data();
+
+phasesData = data.phases;
+
+// 🔷 info o směně pro usera
+renderShiftInfo(data.info);
+
+render();
+
 }
 
 /* RENDER */
@@ -259,6 +287,25 @@ function render(){
  });
 
  gridEl.innerHTML = html;
+}
+
+function renderShiftInfo(info){
+
+ if(!info){
+   shiftInfoBox.style.display = "none";
+   return;
+ }
+
+ shiftInfoBox.style.display = "block";
+
+ infoSK.innerHTML =
+   `<div class="infoRow">Scala/Kamiq<span>${info.sk?.start||""} → ${info.sk?.end||""}</span></div>`;
+
+ infoFA.innerHTML =
+   `<div class="infoRow">Fabie<span>${info.fa?.start||""} → ${info.fa?.end||""}</span></div>`;
+
+ infoZA.innerHTML =
+   `<div class="infoRow">Zásobník<span>${info.za?.start||""} → ${info.za?.end||""}</span></div>`;
 }
 
 /* EVENTS */
