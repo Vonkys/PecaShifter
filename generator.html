@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -316,13 +315,35 @@ let phaseReserves=[];
 async function loadWorkers(){
  const snap = await getDocs(collection(db,"employees"));
  workers=[];
+
  snap.forEach(d=>{
   const e=d.data();
-  if(e.statusToday==="work"){
-    workers.push({id:d.id,name:e.name,skills:e.skills||[]});
+  const st = e.statusToday;
+
+  // ❌ tihle se NIKDY negenerují
+  if(
+    st === "sick" ||
+    st === "vacation" ||
+    st === "paragraf" ||
+    st === "shitmaking" ||
+    st === "loaned" ||
+    st === "borrowed"
+  ){
+    return;
   }
+
+  // ✅ jen skuteční pracovníci
+  if(st === "work"){
+    workers.push({
+      id:d.id,
+      name:e.name,
+      skills:e.skills || []
+    });
+  }
+
  });
 }
+
 
 /* BUILD */
 
@@ -365,7 +386,11 @@ function buildPhase(act) {
       historyStats[wId + "_" + p] = (historyStats[wId + "_" + p] || 0) + 1;
       lastPosByWorker[wId] = p; 
     }
-    return { assign: bestResult, reserves: [] };
+    const usedIds = new Set(Object.values(bestResult).map(w=>w.id));
+const reserves = workers.filter(w=>!usedIds.has(w.id));
+
+return { assign: bestResult, reserves };
+
   }
 
   return null;
