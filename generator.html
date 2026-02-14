@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="cs">
 <head>
@@ -600,6 +601,7 @@ saveBtn.onclick = async ()=>{
   return;
  }
 
+ // 🔷 phase data
  const out = phases.map(ph=>{
   const o={};
   Object.entries(ph).forEach(([pos,w])=>{
@@ -608,15 +610,25 @@ saveBtn.onclick = async ()=>{
   return o;
  });
 
+ // 🔷 status snapshot zaměstnanců v den uložení
+ const empSnap = await getDocs(collection(db,"employees"));
+ const statusSnapshot = {};
+
+ empSnap.forEach(d=>{
+   statusSnapshot[d.id] = d.data().statusToday || "work";
+ });
+
  await setDoc(doc(db,"shifts",dateEl.value+"_"+shiftEl.value),{
   date:dateEl.value,
   shift:shiftEl.value,
   phases:out,
+  statusSnapshot,   // ✅ TADY JE TEN ZÁZRAK
   createdAt:Date.now()
  });
 
- alert("✅ Uloženo");
+ alert("✅ Uloženo (včetně status snapshotu)");
 };
+
 
 </script>
 </body>
