@@ -84,7 +84,6 @@ const filterEl = document.getElementById("filter");
 const rankAbsEl = document.getElementById("rankAbs");
 const rankActiveEl = document.getElementById("rankActive");
 
-
 /* LOAD */
 
 const empSnap = await getDocs(collection(db,"employees"));
@@ -94,65 +93,66 @@ const empStatus={}, empNames={}, stats={}, posCount={};
 
 empSnap.forEach(d=>{
  const e=d.data();
- empStatus[d.id]=e.statusToday||"work";
- empNames[d.id]=e.name+" "+e.surname;
 
- stats[d.id]={
+ empStatus[d.id] = e.statusToday || "work";
+ empNames[d.id] = e.name+" "+e.surname;
+
+ stats[d.id] = {
   active:0,
   reserve:0,
   absence:0,
-  pos:{},
-  posList:[]
+  pos:{}
  };
 });
 
-/* ===== HLAVNÍ VÝPOČET ===== */
+/* =======================
+   HLAVNÍ VÝPOČET
+======================= */
 
 shiftSnap.forEach(docSnap=>{
 
  const shift = docSnap.data();
+ const phases = shift.phases || [];
 
- // 🔷 nejdřív loaned — celá směna = 4 fáze
+ // ✅ LOANED = celá směna = 4 fáze
  Object.entries(empStatus).forEach(([id,st])=>{
    if(st === "loaned"){
-     stats[id].active += 4;
+     stats[id].active += phases.length || 4;
    }
  });
 
- shift.phases.forEach(phase=>{
+ phases.forEach(phase=>{
 
    const used = new Set(Object.values(phase));
 
-   // ===== aktivní obsazení =====
+   /* ===== AKTIVNÍ POZICE ===== */
+
    Object.entries(phase).forEach(([pos,id])=>{
 
      if(!stats[id]) return;
 
      const st = empStatus[id];
 
-     // borrowed jen když je work
-     if(st === "borrowed") return;
+     // loaned už má započítáno za směnu
+     if(st === "loaned") return;
 
+     // borrowed se počítá jen když JE na pozici → což právě je
      stats[id].active++;
 
-     stats[id].pos[pos]=(stats[id].pos[pos]||0)+1;
-     stats[id].posList.push(pos);
-
-     posCount[pos]=(posCount[pos]||0)+1;
+     stats[id].pos[pos] = (stats[id].pos[pos]||0)+1;
+     posCount[pos] = (posCount[pos]||0)+1;
    });
 
-   // ===== zbytek lidí =====
+   /* ===== MIMO POZICE ===== */
+
    Object.keys(stats).forEach(id=>{
 
      if(used.has(id)) return;
 
      const st = empStatus[id];
 
-     // ❌ borrowed mimo práci = nic
-     if(st === "borrowed") return;
-
-     // ❌ loaned už započítán celou směnou
-     if(st === "loaned") return;
+     if(st === "loaned") return;     // už započteno
+     if(st === "borrowed") return;   // mimo = nepočítat nic
 
      if(st==="sick"||st==="vacation"||st==="paragraf"){
        stats[id].absence++;
@@ -167,8 +167,9 @@ shiftSnap.forEach(docSnap=>{
 
 });
 
-
-/* ===== RANKINGS ===== */
+/* =======================
+   RANKINGS
+======================= */
 
 function top3(arr){
  return arr.sort((a,b)=>b.val-a.val).slice(0,3);
@@ -176,6 +177,8 @@ function top3(arr){
 
 rankAbsEl.innerHTML="";
 rankActiveEl.innerHTML="";
+
+/* ABSENCE */
 
 top3(
  Object.entries(stats)
@@ -189,8 +192,7 @@ top3(
    `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
 });
 
-
-/* 🧊 NEJMÍŇ VYTÍŽENÍ — jen kdo je v práci */
+/* NEJMÉNĚ VYTÍŽENÍ */
 
 const leastActive = Object.entries(stats)
   .filter(([id])=>{
@@ -209,9 +211,9 @@ leastActive.forEach(x=>{
     `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
 });
 
-
-
-/* ===== KARTY ===== */
+/* =======================
+   KARTY
+======================= */
 
 function render(){
 
@@ -243,14 +245,15 @@ function render(){
    </div>
 
    <div style="margin-top:10px;font-weight:800;">
-  Pozice — součet:
-</div>
+     Pozice — součet:
+   </div>
 
-${Object.entries(s.pos)
-  .sort((a,b)=>b[1]-a[1])
-  .map(([p,c])=>`<div class="posItem">${p} — ${c}×</div>`)
-  .join("")}
-
+   ${
+     Object.entries(s.pos)
+       .sort((a,b)=>b[1]-a[1])
+       .map(([p,c])=>`<div class="posItem">${p} — ${c}×</div>`)
+       .join("")
+   }
   `;
 
   cardsEl.appendChild(div);
