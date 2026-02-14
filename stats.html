@@ -60,7 +60,7 @@ input{
 <input id="filter" placeholder="🔎 Filtr podle jména…">
 
 <div class="card"><h3>🚨 Největší absence</h3><div id="rankAbs"></div></div>
-<div class="card"><h3>🔥 Nejméně vytížení</h3><div id="rankActive"></div></div>
+
 
 
 <div id="cards"><div class="loading">Počítám data…</div></div>
@@ -83,7 +83,7 @@ const db = getFirestore(app);
 const cardsEl = document.getElementById("cards");
 const filterEl = document.getElementById("filter");
 const rankAbsEl = document.getElementById("rankAbs");
-const rankActiveEl = document.getElementById("rankActive");
+
 
 /* =======================
    LOAD
@@ -191,7 +191,7 @@ function top3(arr){
 }
 
 rankAbsEl.innerHTML="";
-rankActiveEl.innerHTML="";
+
 
 /* ABSENCE */
 
@@ -207,24 +207,7 @@ top3(
    `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
 });
 
-/* NEJMÉNĚ VYTÍŽENÍ */
 
-const leastActive = Object.entries(stats)
-  .filter(([id])=>{
-    const st = empCurrentStatus[id];
-    return st==="work" || st==="shitmaking" || st==="borrowed" || st==="loaned";
-  })
-  .map(([id,s])=>({
-    name: empNames[id],
-    val: s.active
-  }))
-  .sort((a,b)=>a.val-b.val)
-  .slice(0,3);
-
-leastActive.forEach(x=>{
-  rankActiveEl.innerHTML +=
-    `<div class="rankRow">${x.name}<span>${x.val}</span></div>`;
-});
 
 /* =======================
    KARTY
