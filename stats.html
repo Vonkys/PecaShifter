@@ -160,12 +160,21 @@ shiftSnap.forEach(docSnap=>{
      if(st === "loaned") return;
      if(st === "borrowed") return;
 
-     if(st==="sick"||st==="vacation"||st==="paragraf"){
-       stats[id].absence++;
-     }
-     else if(st==="work" || st==="shitmaking"){
-       stats[id].reserve++;
-     }
+     // ❌ nemoc + paragraf = absence
+if(st==="sick" || st==="paragraf"){
+  stats[id].absence++;
+}
+
+// 🟡 dovolená = nepočítat vůbec nic
+else if(st==="vacation"){
+  // nic
+}
+
+// ✅ normální pracovní stavy = náhradník
+else if(st==="work" || st==="shitmaking"){
+  stats[id].reserve++;
+}
+
 
    });
 
