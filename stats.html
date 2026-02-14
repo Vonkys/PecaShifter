@@ -77,6 +77,7 @@ const app = initializeApp({
  authDomain:"shifter-ee3e6.firebaseapp.com",
  projectId:"shifter-ee3e6"
 });
+
 const db = getFirestore(app);
 
 const cardsEl = document.getElementById("cards");
@@ -84,17 +85,22 @@ const filterEl = document.getElementById("filter");
 const rankAbsEl = document.getElementById("rankAbs");
 const rankActiveEl = document.getElementById("rankActive");
 
-/* LOAD */
+/* =======================
+   LOAD
+======================= */
 
 const empSnap = await getDocs(collection(db,"employees"));
 const shiftSnap = await getDocs(collection(db,"shifts"));
 
-const empStatus={}, empNames={}, stats={}, posCount={};
+const empCurrentStatus = {};
+const empNames = {};
+const stats = {};
+const posCount = {};
 
 empSnap.forEach(d=>{
  const e=d.data();
 
- empStatus[d.id] = e.statusToday || "work";
+ empCurrentStatus[d.id] = e.statusToday || "work";
  empNames[d.id] = e.name+" "+e.surname;
 
  stats[d.id] = {
@@ -113,10 +119,11 @@ shiftSnap.forEach(docSnap=>{
 
  const shift = docSnap.data();
  const phases = shift.phases || [];
+ const snapStatus = shift.statusSnapshot || {}; // ✅ snapshot dne
 
- // ✅ LOANED = celá směna = 4 fáze
- Object.entries(empStatus).forEach(([id,st])=>{
-   if(st === "loaned"){
+ // 🔷 LOANED = celá směna = všechny fáze
+ Object.entries(snapStatus).forEach(([id,st])=>{
+   if(st === "loaned" && stats[id]){
      stats[id].active += phases.length || 4;
    }
  });
@@ -125,18 +132,17 @@ shiftSnap.forEach(docSnap=>{
 
    const used = new Set(Object.values(phase));
 
-   /* ===== AKTIVNÍ POZICE ===== */
+   /* ===== AKTIVNÍ ===== */
 
    Object.entries(phase).forEach(([pos,id])=>{
 
      if(!stats[id]) return;
 
-     const st = empStatus[id];
+     const st = snapStatus[id] || empCurrentStatus[id] || "work";
 
-     // loaned už má započítáno za směnu
-     if(st === "loaned") return;
+     if(st === "loaned") return; // už započteno za směnu
 
-     // borrowed se počítá jen když JE na pozici → což právě je
+     // borrowed se počítá jen když JE na pozici → a to právě je
      stats[id].active++;
 
      stats[id].pos[pos] = (stats[id].pos[pos]||0)+1;
@@ -149,10 +155,10 @@ shiftSnap.forEach(docSnap=>{
 
      if(used.has(id)) return;
 
-     const st = empStatus[id];
+     const st = snapStatus[id] || empCurrentStatus[id] || "work";
 
-     if(st === "loaned") return;     // už započteno
-     if(st === "borrowed") return;   // mimo = nepočítat nic
+     if(st === "loaned") return;
+     if(st === "borrowed") return;
 
      if(st==="sick"||st==="vacation"||st==="paragraf"){
        stats[id].absence++;
@@ -196,7 +202,7 @@ top3(
 
 const leastActive = Object.entries(stats)
   .filter(([id])=>{
-    const st = empStatus[id];
+    const st = empCurrentStatus[id];
     return st==="work" || st==="shitmaking" || st==="borrowed" || st==="loaned";
   })
   .map(([id,s])=>({
