@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moje směny</title>
+
+<style>
+body {font-family:system-ui;margin:0;background:#f2f4f7;}
+.header {background:#2f6fb2;color:#fff;padding:16px;text-align:center;font-weight:600;}
+.calendar {max-width:420px;margin:16px auto;background:#fff;border-radius:14px;
+box-shadow:0 4px 12px rgba(0,0,0,.08);padding:12px;}
+
+.month-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.month-bar button{border:none;background:#e7ecf3;border-radius:8px;padding:6px 10px;font-size:16px;}
+
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.day-name{text-align:center;font-size:12px;opacity:.7;}
+.day{background:#f7f9fc;border-radius:10px;height:64px;padding:6px;
+display:flex;flex-direction:column;justify-content:space-between;}
+.today{outline:2px solid #2f6fb2;}
+
+.shift{align-self:flex-start;padding:2px 7px;border-radius:999px;
+font-size:12px;font-weight:700;color:#fff;}
+.N{background:#3c2a5e;}
+.O{background:#ff9800;color:#222;}
+.R{background:#4caf50;}
+.empty{background:transparent;}
+</style>
+</head>
+
+<body>
+
+<div class="header">Moje směny</div>
+
+<div class="calendar">
+  <div class="month-bar">
+    <button onclick="changeMonth(-1)">◀</button>
+    <div id="title"></div>
+    <button onclick="changeMonth(1)">▶</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+const dayNames=["Po","Út","St","Čt","Pá","So","Ne"];
+const monthNames=["Leden","Únor","Březen","Duben","Květen","Červen",
+"Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
+
+/* kotva cyklu — ranní pondělí */
+const cycleStartMonday = new Date(2026,1,2); // 2.2.2026
+
+/* pořadí týdnů */
+const weekCycle = ["R","N","O"];
+
+let current = new Date();
+
+/* pondělí týdne pro dané datum */
+function getMonday(d){
+  const x = new Date(d);
+  const day = (x.getDay()+6)%7;
+  x.setDate(x.getDate()-day);
+  x.setHours(0,0,0,0);
+  return x;
+}
+
+/* index týdne od kotvy */
+function getWeekIndex(date){
+  const m = getMonday(date);
+  const diff = Math.round((m - cycleStartMonday)/(1000*60*60*24));
+  return Math.floor(diff/7);
+}
+
+function weekType(index){
+  return weekCycle[(index % 3 + 3) % 3];
+}
+
+/* ===== HLAVNÍ LOGIKA SMĚNY ===== */
+
+function getShiftForDate(date){
+  const day = (date.getDay()+6)%7; // Po=0 … Ne=6
+  const w = getWeekIndex(date);
+
+  const thisWeek = weekType(w);
+  const nextWeek = weekType(w+1);
+
+  // neděle patří už do dalšího týdne cyklu
+  if(day === 6){
+    if(nextWeek === "N") return "N";
+    return null;
+  }
+
+  if(thisWeek === "R"){
+    return day <= 4 ? "R" : null;
+  }
+
+  if(thisWeek === "O"){
+    return day <= 4 ? "O" : null;
+  }
+
+  if(thisWeek === "N"){
+    return day <= 3 ? "N" : null; // Po–Čt
+  }
+
+  return null;
+}
+
+/* ===== RENDER ===== */
+
+function render(){
+  const grid=document.getElementById("grid");
+  grid.innerHTML="";
+
+  const y=current.getFullYear();
+  const m=current.getMonth();
+  document.getElementById("title").innerText=monthNames[m]+" "+y;
+
+  dayNames.forEach(n=>{
+    const e=document.createElement("div");
+    e.className="day-name";
+    e.innerText=n;
+    grid.appendChild(e);
+  });
+
+  const first=new Date(y,m,1);
+  const start=(first.getDay()+6)%7;
+
+  for(let i=0;i<start;i++){
+    const e=document.createElement("div");
+    e.className="day empty";
+    grid.appendChild(e);
+  }
+
+  const days=new Date(y,m+1,0).getDate();
+  const today=new Date();
+
+  for(let d=1; d<=days; d++){
+    const cell=document.createElement("div");
+    cell.className="day";
+
+    const dt=new Date(y,m,d);
+    if(dt.toDateString()===today.toDateString())
+      cell.classList.add("today");
+
+    const num=document.createElement("div");
+    num.innerText=d;
+
+    const s=getShiftForDate(dt);
+    if(s){
+      const b=document.createElement("div");
+      b.className="shift "+s;
+      b.innerText=s;
+      cell.appendChild(b);
+    }
+
+    cell.appendChild(num);
+    grid.appendChild(cell);
+  }
+}
+
+function changeMonth(x){
+  current.setMonth(current.getMonth()+x);
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
