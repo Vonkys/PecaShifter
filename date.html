@@ -100,7 +100,6 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 
 </div>
 </div>
-
 <script>
 
 const dayNames=["Po","Út","St","Čt","Pá","So","Ne"];
@@ -108,30 +107,41 @@ const monthNames=["Leden","Únor","Březen","Duben","Květen","Červen",
 "Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 
 /* kotva cyklu — ranní pondělí */
-const cycleStartMonday = new Date(2026,1,2); // 2.2.2026
+const cycleStartMonday = new Date(Date.UTC(2026,1,2)); // UTC !!
 
-const weekCycle = ["R","N","O"];
+const weekCycle = ["N","O","R"];
 
-function getMonday(d){
-  const x=new Date(d);
-  const day=(x.getDay()+6)%7;
-  x.setDate(x.getDate()-day);
-  x.setHours(0,0,0,0);
-  return x;
+function getMondayUTC(d){
+  const day = (d.getUTCDay()+6)%7;
+  return new Date(Date.UTC(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate()-day
+  ));
 }
 
 function weekType(i){
   return weekCycle[(i%3+3)%3];
 }
 
-/* ✅ směna jen Po–Pá podle týdne */
 function getShiftForDate(date){
-  const day=(date.getDay()+6)%7; // Po=0
 
-  if(day > 4) return null; // So + Ne nic
+  const day = (date.getDay()+6)%7; // Po=0
+  if(day > 4) return null; // jen Po–Pá
 
-  const diff=(getMonday(date)-cycleStartMonday)/(1000*60*60*24);
-  const w=Math.floor(diff/7);
+  const dUTC = new Date(Date.UTC(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  ));
+
+  const monday = getMondayUTC(dUTC);
+
+  const diffDays = Math.round(
+    (monday - cycleStartMonday) / 86400000
+  );
+
+  const w = Math.floor(diffDays / 7);
 
   return weekType(w);
 }
@@ -199,7 +209,5 @@ function changeMonth(x){
 render();
 
 </script>
-
-
 </body>
 </html>
