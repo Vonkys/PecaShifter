@@ -58,8 +58,11 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
  font-weight:800;
 }
 
-.today{
- outline:2px solid #38bdf8;
+.today{ outline:2px solid #38bdf8; }
+
+.holiday{
+ outline:2px solid #ef4444;
+ background:#1a0b0b;
 }
 
 .shift{
@@ -69,6 +72,15 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
  font-size:12px;
  font-weight:900;
  color:white;
+}
+
+.hBadge{
+ background:#ef4444;
+ color:white;
+ font-size:10px;
+ padding:2px 6px;
+ border-radius:999px;
+ font-weight:900;
 }
 
 .R{ background:#16a34a; }
@@ -87,7 +99,6 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 </div>
 
 <div class="container">
-
 <div class="card">
 
 <div class="monthBar">
@@ -100,55 +111,115 @@ body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 
 </div>
 </div>
+
 <script>
+
+/* ===== názvy ===== */
 
 const dayNames=["Po","Út","St","Čt","Pá","So","Ne"];
 const monthNames=["Leden","Únor","Březen","Duben","Květen","Červen",
 "Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 
-/* kotva cyklu — ranní pondělí */
-const cycleStartMonday = new Date(Date.UTC(2026,1,2)); // UTC !!
+/* ===== pevné svátky CZ ===== */
 
+const fixedHolidays = [
+ "01-01",
+ "05-01","05-08",
+ "07-05","07-06",
+ "09-28",
+ "10-28",
+ "11-17",
+ "12-24","12-25","12-26"
+];
+
+/* ===== výpočet Velikonoc ===== */
+
+function easterSunday(year){
+ const a = year % 19;
+ const b = Math.floor(year/100);
+ const c = year % 100;
+ const d = Math.floor(b/4);
+ const e = b % 4;
+ const f = Math.floor((b+8)/25);
+ const g = Math.floor((b-f+1)/3);
+ const h = (19*a+b-d-g+15)%30;
+ const i = Math.floor(c/4);
+ const k = c % 4;
+ const l = (32+2*e+2*i-h-k)%7;
+ const m = Math.floor((a+11*h+22*l)/451);
+ const month = Math.floor((h+l-7*m+114)/31);
+ const day = ((h+l-7*m+114)%31)+1;
+ return new Date(year, month-1, day);
+}
+
+function getEasterHolidays(year){
+ const easter = easterSunday(year);
+
+ const goodFriday = new Date(easter);
+ goodFriday.setDate(easter.getDate()-2);
+
+ const easterMonday = new Date(easter);
+ easterMonday.setDate(easter.getDate()+1);
+
+ return [goodFriday, easterMonday];
+}
+
+function isHoliday(date){
+
+ const key =
+  String(date.getMonth()+1).padStart(2,"0")+"-"+
+  String(date.getDate()).padStart(2,"0");
+
+ if(fixedHolidays.includes(key)) return true;
+
+ const easterDays = getEasterHolidays(date.getFullYear());
+
+ return easterDays.some(d =>
+  d.getFullYear()===date.getFullYear() &&
+  d.getMonth()===date.getMonth() &&
+  d.getDate()===date.getDate()
+ );
+}
+
+/* ===== SMĚNOVÝ CYKLUS ===== */
+
+const cycleStartMonday = new Date(Date.UTC(2026,1,2));
 const weekCycle = ["N","O","R"];
 
 function getMondayUTC(d){
-  const day = (d.getUTCDay()+6)%7;
-  return new Date(Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate()-day
-  ));
+ const day=(d.getUTCDay()+6)%7;
+ return new Date(Date.UTC(
+  d.getUTCFullYear(),
+  d.getUTCMonth(),
+  d.getUTCDate()-day
+ ));
 }
 
 function weekType(i){
-  return weekCycle[(i%3+3)%3];
+ return weekCycle[(i%3+3)%3];
 }
 
 function getShiftForDate(date){
 
-  const day = (date.getDay()+6)%7; // Po=0
-  if(day > 4) return null; // jen Po–Pá
+ const day=(date.getDay()+6)%7;
+ if(day>4) return null;
 
-  const dUTC = new Date(Date.UTC(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  ));
+ const dUTC=new Date(Date.UTC(
+  date.getFullYear(),
+  date.getMonth(),
+  date.getDate()
+ ));
 
-  const monday = getMondayUTC(dUTC);
+ const monday=getMondayUTC(dUTC);
+ const diffDays=Math.round((monday-cycleStartMonday)/86400000);
+ const w=Math.floor(diffDays/7);
 
-  const diffDays = Math.round(
-    (monday - cycleStartMonday) / 86400000
-  );
-
-  const w = Math.floor(diffDays / 7);
-
-  return weekType(w);
+ return weekType(w);
 }
 
-let current=new Date();
+/* ===== RENDER ===== */
 
-/* ===== render ===== */
+let current=new Date();
 
 function render(){
  const grid=document.getElementById("grid");
@@ -182,8 +253,12 @@ function render(){
   cell.className="day";
 
   const dt=new Date(y,m,d);
+
   if(dt.toDateString()===today.toDateString())
     cell.classList.add("today");
+
+  if(isHoliday(dt))
+    cell.classList.add("holiday");
 
   const num=document.createElement("div");
   num.innerText=d;
@@ -194,6 +269,13 @@ function render(){
     b.className="shift "+s;
     b.innerText=s;
     cell.appendChild(b);
+  }
+
+  if(isHoliday(dt)){
+    const h=document.createElement("div");
+    h.className="hBadge";
+    h.innerText="SV";
+    cell.appendChild(h);
   }
 
   cell.appendChild(num);
@@ -209,5 +291,6 @@ function changeMonth(x){
 render();
 
 </script>
+
 </body>
 </html>
