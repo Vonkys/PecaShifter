@@ -2,167 +2,207 @@
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Moje směny</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalendář směn</title>
 
 <style>
-body {font-family:system-ui;margin:0;background:#f2f4f7;}
-.header {background:#2f6fb2;color:#fff;padding:16px;text-align:center;font-weight:600;}
-.calendar {max-width:420px;margin:16px auto;background:#fff;border-radius:14px;
-box-shadow:0 4px 12px rgba(0,0,0,.08);padding:12px;}
+body{margin:0;font-family:system-ui;background:#0f172a;color:white;}
 
-.month-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.month-bar button{border:none;background:#e7ecf3;border-radius:8px;padding:6px 10px;font-size:16px;}
+.topbar{
+ height:56px;display:flex;align-items:center;justify-content:space-between;
+ padding:0 16px;background:#020617;border-bottom:1px solid #1f2937;
+}
 
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-.day-name{text-align:center;font-size:12px;opacity:.7;}
-.day{background:#f7f9fc;border-radius:10px;height:64px;padding:6px;
-display:flex;flex-direction:column;justify-content:space-between;}
-.today{outline:2px solid #2f6fb2;}
+.menuBtn{
+ padding:8px 14px;border-radius:10px;border:none;font-weight:800;
+ background:#334155;color:white;cursor:pointer;
+}
 
-.shift{align-self:flex-start;padding:2px 7px;border-radius:999px;
-font-size:12px;font-weight:700;color:#fff;}
-.N{background:#3c2a5e;}
-.O{background:#ff9800;color:#222;}
-.R{background:#4caf50;}
-.empty{background:transparent;}
+.container{max-width:480px;margin:auto;padding:16px;}
+
+.card{
+ background:#111827;border-radius:16px;padding:16px;margin-bottom:14px;
+}
+
+.monthBar{
+ display:flex;justify-content:space-between;align-items:center;
+ margin-bottom:12px;font-weight:900;font-size:18px;
+}
+
+.monthBtn{
+ background:#1f2937;border:none;color:white;
+ padding:8px 12px;border-radius:10px;font-weight:900;
+}
+
+.grid{
+ display:grid;
+ grid-template-columns:repeat(7,1fr);
+ gap:8px;
+}
+
+.dayName{
+ text-align:center;
+ font-size:12px;
+ opacity:.7;
+ font-weight:800;
+}
+
+.day{
+ background:#020617;
+ border-radius:12px;
+ height:72px;
+ padding:6px;
+ display:flex;
+ flex-direction:column;
+ justify-content:space-between;
+ font-weight:800;
+}
+
+.today{
+ outline:2px solid #38bdf8;
+}
+
+.shift{
+ align-self:flex-start;
+ padding:3px 9px;
+ border-radius:999px;
+ font-size:12px;
+ font-weight:900;
+ color:white;
+}
+
+.R{ background:#16a34a; }
+.N{ background:#7c3aed; }
+.O{ background:#f59e0b; color:black; }
+
+.empty{ background:transparent; }
 </style>
 </head>
 
 <body>
 
-<div class="header">Moje směny</div>
-
-<div class="calendar">
-  <div class="month-bar">
-    <button onclick="changeMonth(-1)">◀</button>
-    <div id="title"></div>
-    <button onclick="changeMonth(1)">▶</button>
-  </div>
-  <div class="grid" id="grid"></div>
+<div class="topbar">
+ <div><b>📅 Kalendář směn</b></div>
+ <button class="menuBtn" onclick="location.href='index.html'">Menu</button>
 </div>
+
+<div class="container">
+
+<div class="card">
+
+<div class="monthBar">
+ <button class="monthBtn" onclick="changeMonth(-1)">◀</button>
+ <div id="title"></div>
+ <button class="monthBtn" onclick="changeMonth(1)">▶</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+</div>
+</div>
+
 <script>
+
 const dayNames=["Po","Út","St","Čt","Pá","So","Ne"];
 const monthNames=["Leden","Únor","Březen","Duben","Květen","Červen",
 "Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 
-/* kotva cyklu — ranní pondělí */
-const cycleStartMonday = new Date(2026,1,2); // 2.2.2026
-
-/* pořadí týdnů */
+/* kotva cyklu */
+const cycleStartMonday = new Date(2026,1,2); // Po 2.2.2026
 const weekCycle = ["R","N","O"];
 
-let current = new Date();
-
-/* pondělí týdne pro dané datum */
 function getMonday(d){
-  const x = new Date(d);
-  const day = (x.getDay()+6)%7;
+  const x=new Date(d);
+  const day=(x.getDay()+6)%7;
   x.setDate(x.getDate()-day);
   x.setHours(0,0,0,0);
   return x;
 }
 
-/* index týdne od kotvy */
-function getWeekIndex(date){
-  const m = getMonday(date);
-  const diff = Math.round((m - cycleStartMonday)/(1000*60*60*24));
-  return Math.floor(diff/7);
+function weekType(i){
+  return weekCycle[(i%3+3)%3];
 }
-
-function weekType(index){
-  return weekCycle[(index % 3 + 3) % 3];
-}
-
-/* ===== HLAVNÍ LOGIKA SMĚNY ===== */
 
 function getShiftForDate(date){
-  const day = (date.getDay()+6)%7; // Po=0 … Ne=6
-  const w = getWeekIndex(date);
+  const day=(date.getDay()+6)%7;
+  const diff=(getMonday(date)-cycleStartMonday)/(1000*60*60*24);
+  const w=Math.floor(diff/7);
 
-  const thisWeek = weekType(w);
-  const nextWeek = weekType(w+1);
+  const thisWeek=weekType(w);
+  const nextWeek=weekType(w+1);
 
-  // neděle patří už do dalšího týdne cyklu
-  if(day === 6){
-    if(nextWeek === "N") return "N";
-    return null;
+  if(day===6){
+    return nextWeek==="N" ? "N" : null;
   }
 
-  if(thisWeek === "R"){
-    return day <= 4 ? "R" : null;
-  }
-
-  if(thisWeek === "O"){
-    return day <= 4 ? "O" : null;
-  }
-
-  if(thisWeek === "N"){
-    return day <= 3 ? "N" : null; // Po–Čt
-  }
+  if(thisWeek==="R") return day<=4 ? "R":null;
+  if(thisWeek==="O") return day<=4 ? "O":null;
+  if(thisWeek==="N") return day<=3 ? "N":null;
 
   return null;
 }
 
-/* ===== RENDER ===== */
+let current=new Date();
 
 function render(){
-  const grid=document.getElementById("grid");
-  grid.innerHTML="";
+ const grid=document.getElementById("grid");
+ grid.innerHTML="";
 
-  const y=current.getFullYear();
-  const m=current.getMonth();
-  document.getElementById("title").innerText=monthNames[m]+" "+y;
+ const y=current.getFullYear();
+ const m=current.getMonth();
+ document.getElementById("title").innerText=monthNames[m]+" "+y;
 
-  dayNames.forEach(n=>{
-    const e=document.createElement("div");
-    e.className="day-name";
-    e.innerText=n;
-    grid.appendChild(e);
-  });
+ dayNames.forEach(n=>{
+  const e=document.createElement("div");
+  e.className="dayName";
+  e.innerText=n;
+  grid.appendChild(e);
+ });
 
-  const first=new Date(y,m,1);
-  const start=(first.getDay()+6)%7;
+ const first=new Date(y,m,1);
+ const start=(first.getDay()+6)%7;
 
-  for(let i=0;i<start;i++){
-    const e=document.createElement("div");
-    e.className="day empty";
-    grid.appendChild(e);
+ for(let i=0;i<start;i++){
+  const e=document.createElement("div");
+  e.className="day empty";
+  grid.appendChild(e);
+ }
+
+ const days=new Date(y,m+1,0).getDate();
+ const today=new Date();
+
+ for(let d=1; d<=days; d++){
+  const cell=document.createElement("div");
+  cell.className="day";
+
+  const dt=new Date(y,m,d);
+  if(dt.toDateString()===today.toDateString())
+    cell.classList.add("today");
+
+  const num=document.createElement("div");
+  num.innerText=d;
+
+  const s=getShiftForDate(dt);
+  if(s){
+    const b=document.createElement("div");
+    b.className="shift "+s;
+    b.innerText=s;
+    cell.appendChild(b);
   }
 
-  const days=new Date(y,m+1,0).getDate();
-  const today=new Date();
-
-  for(let d=1; d<=days; d++){
-    const cell=document.createElement("div");
-    cell.className="day";
-
-    const dt=new Date(y,m,d);
-    if(dt.toDateString()===today.toDateString())
-      cell.classList.add("today");
-
-    const num=document.createElement("div");
-    num.innerText=d;
-
-    const s=getShiftForDate(dt);
-    if(s){
-      const b=document.createElement("div");
-      b.className="shift "+s;
-      b.innerText=s;
-      cell.appendChild(b);
-    }
-
-    cell.appendChild(num);
-    grid.appendChild(cell);
-  }
+  cell.appendChild(num);
+  grid.appendChild(cell);
+ }
 }
 
 function changeMonth(x){
-  current.setMonth(current.getMonth()+x);
-  render();
+ current.setMonth(current.getMonth()+x);
+ render();
 }
 
 render();
+
 </script>
+
 </body>
 </html>
