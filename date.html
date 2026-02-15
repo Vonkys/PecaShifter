@@ -107,8 +107,9 @@ const dayNames=["Po","Út","St","Čt","Pá","So","Ne"];
 const monthNames=["Leden","Únor","Březen","Duben","Květen","Červen",
 "Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
 
-/* kotva cyklu */
-const cycleStartMonday = new Date(2026,1,2); // Po 2.2.2026
+/* kotva cyklu — ranní pondělí */
+const cycleStartMonday = new Date(2026,1,2); // 2.2.2026
+
 const weekCycle = ["R","N","O"];
 
 function getMonday(d){
@@ -123,26 +124,21 @@ function weekType(i){
   return weekCycle[(i%3+3)%3];
 }
 
+/* ✅ směna jen Po–Pá podle týdne */
 function getShiftForDate(date){
-  const day=(date.getDay()+6)%7;
+  const day=(date.getDay()+6)%7; // Po=0
+
+  if(day > 4) return null; // So + Ne nic
+
   const diff=(getMonday(date)-cycleStartMonday)/(1000*60*60*24);
   const w=Math.floor(diff/7);
 
-  const thisWeek=weekType(w);
-  const nextWeek=weekType(w+1);
-
-  if(day===6){
-    return nextWeek==="N" ? "N" : null;
-  }
-
-  if(thisWeek==="R") return day<=4 ? "R":null;
-  if(thisWeek==="O") return day<=4 ? "O":null;
-  if(thisWeek==="N") return day<=3 ? "N":null;
-
-  return null;
+  return weekType(w);
 }
 
 let current=new Date();
+
+/* ===== render ===== */
 
 function render(){
  const grid=document.getElementById("grid");
@@ -203,6 +199,7 @@ function changeMonth(x){
 render();
 
 </script>
+
 
 </body>
 </html>
