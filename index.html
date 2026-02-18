@@ -37,7 +37,9 @@ body{
   border-radius:16px;
   padding:20px;
   box-shadow:0 10px 25px rgba(0,0,0,.35);
+  position:relative;   /* ← přidat */
 }
+
 
 
 #loading{
@@ -45,8 +47,32 @@ body{
   opacity:.8;
 }
 
-/* switch */
+.roleBadge{
+  position:absolute;
+  top:12px;
+  right:14px;
+  font-size:13px;
+  font-weight:800;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#1f2937;
+  opacity:.9;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+}
 
+.roleAdmin{
+  background:#22c55e;
+  color:black;
+}
+
+.roleUser{
+  background:#334155;
+  color:white;
+}
+
+
+/* switch */
 .switch{
   display:flex;
   background:#1f2937;
@@ -135,6 +161,30 @@ input{
 
 .hidden{ display:none; }
 
+.roleBadge{
+  position:fixed;
+  top:10px;
+  right:12px;
+  z-index:999;
+  font-size:13px;
+  font-weight:900;
+  padding:7px 12px;
+  border-radius:999px;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  backdrop-filter: blur(6px);
+}
+
+.roleAdmin{
+  background:#22c55e;
+  color:black;
+}
+
+.roleUser{
+  background:#334155;
+  color:white;
+}
+
 .roleTag{
   text-align:center;
   margin-bottom:10px;
@@ -145,7 +195,7 @@ input{
 </head>
 
 <body>
-
+<div id="roleLabel" class="hidden"></div>
 <div class="app">
 
 <div class="logo">PecaShifter</div>
@@ -175,7 +225,6 @@ input{
 
 <!-- MENU -->
 <div id="menuCard" class="card hidden">
-<div class="roleTag" id="roleLabel"></div>
 <!-- HROMADNÁ ZPRÁVA -->
 <div id="broadcastCard" class="card hidden" style="
   margin-bottom:14px;
@@ -334,7 +383,9 @@ onAuthStateChanged(auth, async user=>{
   const snap = await getDoc(doc(db,"users",user.uid));
   const role = snap.data()?.role || "user";
 
-  roleLabel.innerText = "Role: "+role;
+  roleLabel.innerText = role;
+roleLabel.className = "roleBadge " + (role==="admin" ? "roleAdmin" : "roleUser");
+
 
   if(role!=="admin"){
     document.querySelectorAll(".adminOnly")
