@@ -93,21 +93,21 @@ select{
 
 .modalBox{
   background:#020617;
-  padding:18px;
   border-radius:16px;
   width:100%;
-  max-width:500px;
-  height:60vh;
+  max-width:520px;
+  height:70vh;
   display:flex;
   flex-direction:column;
-  gap:12px;
   overflow:hidden;
 }
 
-
-.modalBox{
+.modalScroll{
+  padding:18px;
   overflow:auto;
+  flex:1;
 }
+
 
 
 
@@ -255,41 +255,49 @@ input, textarea{
 
 <div id="modal" class="modal">
   <div class="modalBox">
+    <div class="modalScroll">
 
-    <input id="fName" placeholder="Jméno">
-    <input id="lName" placeholder="Příjmení">
-    <input id="email" placeholder="Email zaměstnance">
-    <textarea id="info" placeholder="Poznámka"></textarea>
+      <input id="fName" placeholder="Jméno">
+      <input id="lName" placeholder="Příjmení">
+      <input id="email" placeholder="Email zaměstnance">
+      <textarea id="info" placeholder="Poznámka"></textarea>
 
-    <h4>Pozice</h4>
-    <div id="skillsBox" class="skills"></div>
+      <h4>Pozice</h4>
+      <div id="skillsBox" class="skills"></div>
 
-    <h4>Stav dnes</h4>
-    <select id="status">
-  <option value="work">V práci</option>
-  <option value="vacation">Dovolená</option>
-  <option value="paragraf">Paragraf</option>
-  <option value="sick">Nemoc</option>
-  <option value="shitmaking">Shit making</option>
-  <option value="borrowed">Půjčený</option>
-  <option value="loaned">Propůjčený</option>
-</select>
+      <h4>Stav dnes</h4>
+      <select id="status">
+        <option value="work">V práci</option>
+        <option value="vacation">Dovolená</option>
+        <option value="paragraf">Paragraf</option>
+        <option value="sick">Nemoc</option>
+        <option value="shitmaking">Shit making</option>
+        <option value="borrowed">Půjčený</option>
+        <option value="loaned">Propůjčený</option>
+      </select>
 
+      <button class="save" onclick="saveEmp()">Uložit</button>
+      <button class="delete" onclick="deleteEmp()">Smazat</button>
+      <button class="close" onclick="closeModal()">Zavřít</button>
 
-    <button class="save" onclick="saveEmp()">Uložit</button>
-    <button class="delete" onclick="deleteEmp()">Smazat</button>
-    <button class="close" onclick="closeModal()">Zavřít</button>
-
+    </div>
   </div>
 </div>
-</div>
+ 
+
 <div id="broadcastModal" class="modal">
   <div class="modalBox">
-    <h3>📢 Hromadná zpráva</h3>
-    <textarea id="broadcastText" placeholder="Text pro všechny zaměstnance"></textarea>
-    <button class="save" onclick="saveBroadcast()">Uložit zprávu</button>
-    <button class="close" onclick="closeBroadcast()">Zavřít</button>
+    <div class="modalScroll">
+
+      <h3>📢 Hromadná zpráva</h3>
+      <textarea id="broadcastText" placeholder="Text pro všechny zaměstnance"></textarea>
+      <button class="save" onclick="saveBroadcast()">Uložit zprávu</button>
+      <button class="close" onclick="closeBroadcast()">Zavřít</button>
+
+    </div>
   </div>
+</div>
+
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -503,7 +511,7 @@ async function edit(id){
  const snap=await getDoc(doc(db,"employees",id));
  const e=snap.data();
  editId=id;
- modal.style.display="block";
+ modal.style.display="flex";
  fNameEl.value=e.name;
  lNameEl.value=e.surname;
  emailEl.value = e.email || "";
