@@ -83,18 +83,43 @@ select{
 .modal{
   position:fixed;
   inset:0;
-  background:rgba(0,0,0,.7);
+  background:rgba(0,0,0,.75);
   display:none;
+  align-items:center;
+  justify-content:center;
+  padding:12px;
 }
+
 
 .modalBox{
   background:#020617;
-  margin:20px;
   padding:18px;
   border-radius:16px;
-  max-height:90vh;
-  overflow:auto;
+  width:100%;
+  max-width:900px;
+  height:90vh;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
 }
+
+
+
+@media (max-width:600px){
+  .modalBox{
+    margin:0;
+    border-radius:0;
+    min-height:100vh;
+    max-height:100vh;
+  }
+}
+
+.modalBox textarea{
+  flex:1;
+  min-height:220px;
+  resize:vertical;
+}
+
 
 input, textarea{
   width:100%;
@@ -362,7 +387,8 @@ window.openNew=()=>{
     c.checked=false;
     c.parentElement.classList.remove("active");
   });
-  modal.style.display="block";
+  modal.style.display="flex";
+
 };
 
 window.closeModal=()=> modal.style.display="none";
@@ -498,7 +524,8 @@ window.openBroadcast = async ()=>{
 
  const snap = await getDoc(doc(db,"config","global"));
  broadcastTextEl.value = snap.data()?.broadcastMessage || "";
- broadcastModal.style.display = "block";
+ broadcastModal.style.display = "flex";
+
 };
 
 window.closeBroadcast = ()=> broadcastModal.style.display="none";
